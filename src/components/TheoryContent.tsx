@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, AlertTriangle, Lightbulb, BookOpen, ChevronDown, CheckCircle2, Star, Sparkles, Target } from 'lucide-react';
+import { Info, AlertTriangle, Lightbulb, BookOpen, CheckCircle2, Star, Sparkles } from 'lucide-react';
 import { ContentSection, InteractiveContent } from '../types/course';
 import { RealWorldStory, FurtherReadingSection } from './RealWorldComponents';
 
@@ -49,12 +49,10 @@ const highlightStyles = {
 
 function InteractiveDropdown({ content, onComplete }: { content: InteractiveContent; onComplete?: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [showExplanation, setShowExplanation] = useState(false);
   const [answered, setAnswered] = useState(false);
 
   const handleSelect = (value: string) => {
     setSelected(value);
-    setShowExplanation(true);
     if (!answered) {
       setAnswered(true);
       onComplete?.();
@@ -106,7 +104,7 @@ function InteractiveDropdown({ content, onComplete }: { content: InteractiveCont
 
       {selected && (
         <button
-          onClick={() => { setSelected(null); setShowExplanation(false); }}
+          onClick={() => { setSelected(null); }}
           className="mt-3 text-sm text-purple-600 hover:text-purple-700 font-medium"
         >
           Try another answer

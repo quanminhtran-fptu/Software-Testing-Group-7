@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ProgressHeader, Sidebar } from './components/ProgressHeader';
 import { HomeScreen } from './components/HomeScreen';
 import { LessonView } from './components/LessonView';
-import { Mascot, MascotAvatar } from './components/Mascot';
-import { istqbCourse, totalXp } from './data/istqb-course';
-import { Chapter, Lesson, MascotMessage } from './types/course';
-import { supabase } from './lib/supabase';
-import { Sparkles, Target, BookOpen } from 'lucide-react';
+import { MascotAvatar } from './components/Mascot';
+import { istqbCourse } from './data/istqb-course';
+import { MascotMessage } from './types/course';
+import { Sparkles } from 'lucide-react';
+import { pageTransition } from './styles';
 
 type View = 'home' | 'lesson';
 
@@ -23,7 +24,7 @@ export default function App() {
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [welcomeMessage, setWelcomeMessage] = useState<MascotMessage>({
+  const [welcomeMessage] = useState<MascotMessage>({
     type: 'welcome',
     text: 'Welcome to ISTQB Mastery! Learn software testing fundamentals through interactive lessons and quizzes. Click on any chapter to get started!'
   });
@@ -81,7 +82,7 @@ export default function App() {
   }, []);
 
   const handleLessonComplete = useCallback((xpEarned: number) => {
-    const lessonKey = `${currentLesson?.chapterId}-${currentLesson?.lessonId}`;
+    const lessonKey = `${currentLesson?.chapterId ?? 0}-${currentLesson?.lessonId ?? 0}`;
     const newCompleted = new Set(completedLessons);
     newCompleted.add(lessonKey);
     setCompletedLessons(newCompleted);
@@ -152,7 +153,7 @@ export default function App() {
     ? istqbCourse.find((c) => c.id === currentLesson.chapterId)
     : null;
   const currentLessonData = currentChapterData
-    ? currentChapterData.lessons.find((l) => l.id === currentLesson.lessonId)
+    ? currentChapterData.lessons.find((l) => l.id === currentLesson?.lessonId)
     : null;
 
   const findFirstIncompleteLesson = (): LessonState | null => {
@@ -167,7 +168,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <ProgressHeader
         xp={userXp}
         streak={userStreak}
@@ -184,56 +185,79 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
       />
 
-      {view === 'home' && (
-        <div className="lg:pl-80">
-          <HomeScreen
-            chapters={istqbCourse}
-            userXp={userXp}
-            userStreak={userStreak}
-            completedLessons={completedLessons}
-            onStartLesson={handleStartLesson}
-            continueLesson={findFirstIncompleteLesson()}
-          />
+      <div className="lg:pl-80">
+        <AnimatePresence mode="wait">
+          {view === 'home' && (
+            <motion.div
+              key="home"
+              variants={pageTransition}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <HomeScreen
+                chapters={istqbCourse}
+                userXp={userXp}
+                userStreak={userStreak}
+                completedLessons={completedLessons}
+                onStartLesson={handleStartLesson}
+                continueLesson={findFirstIncompleteLesson()}
+              />
 
-          {showWelcome && (
-            <div className="fixed bottom-6 right-6 max-w-sm z-30">
-              <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 animate-slideUp">
-                <div className="flex items-start gap-4">
-                  <MascotAvatar size="lg" animate />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-4 h-4 text-blue-500" />
-                      <h4 className="font-bold text-gray-800">Welcome!</h4>
+              {showWelcome && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                  className="fixed bottom-6 right-6 max-w-sm z-30"
+                >
+                  <div className="bg-white rounded-3xl shadow-large border border-navy-100 p-6">
+                    <div className="flex items-start gap-4">
+                      <MascotAvatar size="lg" animate />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Sparkles className="w-4 h-4 text-primary-500" />
+                          <h4 className="font-bold text-navy-900">Welcome!</h4>
+                        </div>
+                        <p className="text-sm text-navy-500 mb-4">{welcomeMessage.text}</p>
+                        <motion.button
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setShowWelcome(false)}
+                          className="w-full py-2 px-4 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium text-sm shadow-glow"
+                        >
+                          Let's Get Started
+                        </motion.button>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 mb-4">{welcomeMessage.text}</p>
-                    <button
-                      onClick={() => setShowWelcome(false)}
-                      className="w-full py-2 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium text-sm hover:shadow-lg transition-all"
-                    >
-                      Let's Get Started
-                    </button>
                   </div>
-                </div>
-              </div>
-            </div>
+                </motion.div>
+              )}
+            </motion.div>
           )}
-        </div>
-      )}
 
-      {view === 'lesson' && currentChapterData && currentLessonData && (
-        <div className="lg:pl-80">
-          <LessonView
-            chapter={currentChapterData}
-            lesson={currentLessonData}
-            onBack={handleBackToHome}
-            onComplete={handleLessonComplete}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            hasNext={getNextLesson() !== null}
-            hasPrevious={getPreviousLesson() !== null}
-          />
-        </div>
-      )}
+          {view === 'lesson' && currentChapterData && currentLessonData && (
+            <motion.div
+              key={`lesson-${currentLesson?.chapterId}-${currentLesson?.lessonId}`}
+              variants={pageTransition}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <LessonView
+                chapter={currentChapterData}
+                lesson={currentLessonData}
+                onBack={handleBackToHome}
+                onComplete={handleLessonComplete}
+                onNext={handleNext}
+                onPrevious={handlePrevious}
+                hasNext={getNextLesson() !== null}
+                hasPrevious={getPreviousLesson() !== null}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, HelpCircle, ChevronDown, Lightbulb } from 'lucide-react';
 import { Question } from '../types/course';
+import { AnswerButton, ContinueButton, AnswerState } from '../styles';
 
 interface QuestionComponentProps {
   question: Question;
@@ -33,116 +35,94 @@ export function MultipleChoice({ question, onAnswer, showHint }: QuestionCompone
 
   const isCorrect = selected === question.correctAnswer;
 
+  const getButtonState = (option: string): AnswerState => {
+    if (!showResult) {
+      return selected === option ? 'selected' : 'default';
+    }
+    if (option === question.correctAnswer) return 'correct';
+    if (option === selected) return 'wrong';
+    return 'disabled';
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
         <div className="flex-1">
-          <p className="text-lg font-medium text-gray-800">{question.question}</p>
+          <p className="text-lg font-medium text-navy-900">{question.question}</p>
         </div>
         {question.hint && !showResult && (
           <button
             onClick={() => setShowHintState(!showHintState)}
-            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+            className="p-2 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
           >
             <Lightbulb className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      {showHintState && question.hint && (
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 flex items-start gap-2">
-          <Lightbulb className="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sky-700 text-sm">{question.hint}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {showHintState && question.hint && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-primary-50 border border-primary-200 rounded-xl p-3 flex items-start gap-2"
+          >
+            <Lightbulb className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
+            <p className="text-primary-700 text-sm">{question.hint}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {question.options?.map((option, index) => (
-          <button
+          <AnswerButton
             key={index}
+            label={option}
+            index={index}
+            state={getButtonState(option)}
             onClick={() => !showResult && setSelected(option)}
             disabled={showResult}
-            className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-              showResult
-                ? option === question.correctAnswer
-                  ? 'border-emerald-500 bg-emerald-50'
-                  : option === selected
-                  ? 'border-red-400 bg-red-50'
-                  : 'border-gray-200 bg-gray-50 opacity-50'
-                : selected === option
-                ? 'border-blue-500 bg-blue-50 shadow-md'
-                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                  showResult
-                    ? option === question.correctAnswer
-                      ? 'border-emerald-500 bg-emerald-500'
-                      : option === selected
-                      ? 'border-red-400 bg-red-400'
-                      : 'border-gray-300'
-                    : selected === option
-                    ? 'border-blue-500 bg-blue-500'
-                    : 'border-gray-300'
-                }`}
-              >
-                {showResult && option === question.correctAnswer && (
-                  <CheckCircle2 className="w-4 h-4 text-white" />
-                )}
-                {showResult && option === selected && option !== question.correctAnswer && (
-                  <XCircle className="w-4 h-4 text-white" />
-                )}
-              </div>
-              <span className={`font-medium ${showResult && option === question.correctAnswer ? 'text-emerald-700' : 'text-gray-700'}`}>
-                {option}
-              </span>
-            </div>
-          </button>
+          />
         ))}
       </div>
 
       {!showResult ? (
-        <button
+        <ContinueButton
+          state={selected ? 'default' : 'disabled'}
+          label="Check Answer"
           onClick={handleSubmit}
-          disabled={!selected}
-          className={`w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 ${
-            selected
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:scale-[1.02]'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Check Answer
-        </button>
+        />
       ) : (
         <div className="space-y-4">
-          <div
-            className={`p-4 rounded-xl ${
-              isCorrect ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-4 rounded-2xl ${
+              isCorrect ? 'bg-success-50 border border-success-200' : 'bg-error-50 border border-error-200'
             }`}
           >
             <div className="flex items-start gap-3">
               {isCorrect ? (
-                <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0" />
+                <CheckCircle2 className="w-6 h-6 text-success-500 flex-shrink-0" />
               ) : (
-                <XCircle className="w-6 h-6 text-red-500 flex-shrink-0" />
+                <XCircle className="w-6 h-6 text-error-500 flex-shrink-0" />
               )}
               <div>
-                <p className={`font-semibold ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {isCorrect ? 'Correct!' : 'Not quite right'}
+                <p className={`font-semibold ${isCorrect ? 'text-success-700' : 'text-error-700'}`}>
+                  {isCorrect ? "That's right!" : 'Not quite right'}
                 </p>
-                <p className={`mt-1 text-sm ${isCorrect ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className={`mt-1 text-sm ${isCorrect ? 'text-success-600' : 'text-error-600'}`}>
                   {question.explanation}
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {!isCorrect && (
             <button
               onClick={handleRetry}
-              className="w-full py-3 px-6 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
             >
               Try Again
             </button>
@@ -173,88 +153,96 @@ export function DropdownQuestion({ question, onAnswer }: QuestionComponentProps)
 
   return (
     <div className="space-y-4">
-      <p className="text-lg font-medium text-gray-800">{question.question}</p>
+      <p className="text-lg font-medium text-navy-900">{question.question}</p>
 
       <div className="relative">
-        <button
+        <motion.button
+          whileHover={!showResult ? { scale: 1.01 } : undefined}
+          whileTap={!showResult ? { scale: 0.99 } : undefined}
           onClick={() => !showResult && setIsOpen(!isOpen)}
           disabled={showResult}
-          className={`w-full p-4 rounded-xl border-2 text-left flex items-center justify-between transition-all ${
+          className={`w-full p-4 rounded-2xl border-2 text-left flex items-center justify-between transition-colors ${
             showResult
               ? isCorrect
-                ? 'border-emerald-500 bg-emerald-50'
-                : 'border-red-400 bg-red-50'
+                ? 'border-success-500 bg-success-50'
+                : 'border-error-500 bg-error-50'
               : isOpen
-              ? 'border-blue-500 bg-white shadow-lg'
-              : 'border-gray-200 bg-white hover:border-gray-300'
+              ? 'border-primary-500 bg-white shadow-glow'
+              : 'border-navy-200 bg-white hover:border-navy-300'
           }`}
         >
-          <span className={selected ? 'text-gray-800' : 'text-gray-400'}>
+          <span className={selected ? 'text-navy-900' : 'text-navy-400'}>
             {selected || 'Select an answer...'}
           </span>
-          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </button>
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown className="w-5 h-5 text-navy-400" />
+          </motion.div>
+        </motion.button>
 
-        {isOpen && !showResult && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-gray-200 shadow-xl z-10 overflow-hidden">
-            {question.dropdownOptions?.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => {
-                  setSelected(option.label);
-                  setIsOpen(false);
-                }}
-                className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
-                  selected === option.label ? 'bg-blue-50' : ''
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <AnimatePresence>
+          {isOpen && !showResult && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-navy-100 shadow-large z-10 overflow-hidden"
+            >
+              {question.dropdownOptions?.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => {
+                    setSelected(option.label);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full p-4 text-left hover:bg-primary-50 transition-colors ${
+                    selected === option.label ? 'bg-primary-50' : ''
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {!showResult ? (
-        <button
+        <ContinueButton
+          state={selected ? 'default' : 'disabled'}
+          label="Check Answer"
           onClick={handleSubmit}
-          disabled={!selected}
-          className={`w-full py-3 px-6 rounded-xl font-semibold transition-all ${
-            selected
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg hover:shadow-xl'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Check Answer
-        </button>
+        />
       ) : (
         <div className="space-y-4">
-          <div
-            className={`p-4 rounded-xl ${
-              isCorrect ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-4 rounded-2xl ${
+              isCorrect ? 'bg-success-50 border border-success-200' : 'bg-error-50 border border-error-200'
             }`}
           >
             <div className="flex items-start gap-3">
               {isCorrect ? (
-                <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                <CheckCircle2 className="w-6 h-6 text-success-500 flex-shrink-0" />
               ) : (
-                <XCircle className="w-6 h-6 text-red-500" />
+                <XCircle className="w-6 h-6 text-error-500 flex-shrink-0" />
               )}
               <div>
-                <p className={`font-semibold ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {isCorrect ? 'Correct!' : 'Not quite right'}
+                <p className={`font-semibold ${isCorrect ? 'text-success-700' : 'text-error-700'}`}>
+                  {isCorrect ? "That's right!" : 'Not quite right'}
                 </p>
-                <p className={`mt-1 text-sm ${isCorrect ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className={`mt-1 text-sm ${isCorrect ? 'text-success-600' : 'text-error-600'}`}>
                   {question.explanation}
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {!isCorrect && (
             <button
               onClick={handleRetry}
-              className="w-full py-3 px-6 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
             >
               Try Again
             </button>
@@ -265,7 +253,7 @@ export function DropdownQuestion({ question, onAnswer }: QuestionComponentProps)
   );
 }
 
-export function TextInputQuestion({ question, onAnswer, showHint }: QuestionComponentProps) {
+export function TextInputQuestion({ question, onAnswer }: QuestionComponentProps) {
   const [input, setInput] = useState('');
   const [showResult, setShowResult] = useState(false);
   const [showHintState, setShowHintState] = useState(false);
@@ -288,80 +276,84 @@ export function TextInputQuestion({ question, onAnswer, showHint }: QuestionComp
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
-        <p className="text-lg font-medium text-gray-800 flex-1">{question.question}</p>
+        <p className="text-lg font-medium text-navy-900 flex-1">{question.question}</p>
         {question.hint && !showResult && (
           <button
             onClick={() => setShowHintState(!showHintState)}
-            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+            className="p-2 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
           >
             <HelpCircle className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      {showHintState && question.hint && (
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 flex items-start gap-2">
-          <Lightbulb className="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sky-700 text-sm">{question.hint}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {showHintState && question.hint && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-primary-50 border border-primary-200 rounded-xl p-3 flex items-start gap-2"
+          >
+            <Lightbulb className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
+            <p className="text-primary-700 text-sm">{question.hint}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <input
+      <motion.input
+        whileFocus={{ scale: 1.01 }}
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyPress={(e) => e.key === 'Enter' && !showResult && handleSubmit()}
         disabled={showResult}
         placeholder="Type your answer..."
-        className={`w-full p-4 rounded-xl border-2 text-lg transition-all ${
+        className={`w-full p-4 rounded-2xl border-2 text-lg transition-colors ${
           showResult
             ? isCorrect
-              ? 'border-emerald-500 bg-emerald-50'
-              : 'border-red-400 bg-red-50'
-            : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+              ? 'border-success-500 bg-success-50'
+              : 'border-error-500 bg-error-50'
+            : 'border-navy-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 bg-white'
         } outline-none`}
       />
 
       {!showResult ? (
-        <button
+        <ContinueButton
+          state={input.trim() ? 'default' : 'disabled'}
+          label="Check Answer"
           onClick={handleSubmit}
-          disabled={!input.trim()}
-          className={`w-full py-3 px-6 rounded-xl font-semibold transition-all ${
-            input.trim()
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg hover:shadow-xl'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Check Answer
-        </button>
+        />
       ) : (
         <div className="space-y-4">
-          <div
-            className={`p-4 rounded-xl ${
-              isCorrect ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-4 rounded-2xl ${
+              isCorrect ? 'bg-success-50 border border-success-200' : 'bg-error-50 border border-error-200'
             }`}
           >
             <div className="flex items-start gap-3">
               {isCorrect ? (
-                <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                <CheckCircle2 className="w-6 h-6 text-success-500 flex-shrink-0" />
               ) : (
-                <XCircle className="w-6 h-6 text-red-500" />
+                <XCircle className="w-6 h-6 text-error-500 flex-shrink-0" />
               )}
               <div>
-                <p className={`font-semibold ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {isCorrect ? 'Correct!' : `The answer was: ${question.correctAnswer}`}
+                <p className={`font-semibold ${isCorrect ? 'text-success-700' : 'text-error-700'}`}>
+                  {isCorrect ? "That's right!" : `The answer was: ${question.correctAnswer}`}
                 </p>
-                <p className={`mt-1 text-sm ${isCorrect ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className={`mt-1 text-sm ${isCorrect ? 'text-success-600' : 'text-error-600'}`}>
                   {question.explanation}
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {!isCorrect && (
             <button
               onClick={handleRetry}
-              className="w-full py-3 px-6 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
             >
               Try Again
             </button>
@@ -372,7 +364,7 @@ export function TextInputQuestion({ question, onAnswer, showHint }: QuestionComp
   );
 }
 
-export function MultiSelectQuestion({ question, onAnswer, showHint }: QuestionComponentProps) {
+export function MultiSelectQuestion({ question, onAnswer }: QuestionComponentProps) {
   const [selected, setSelected] = useState<string[]>([]);
   const [showResult, setShowResult] = useState(false);
   const [showHintState, setShowHintState] = useState(false);
@@ -401,119 +393,86 @@ export function MultiSelectQuestion({ question, onAnswer, showHint }: QuestionCo
   };
 
   const correctAnswers = question.correctAnswer as string[];
-
   const isOptionCorrect = (option: string) => correctAnswers.includes(option);
   const isOptionSelected = (option: string) => selected.includes(option);
+
+  const getButtonState = (option: string): AnswerState => {
+    if (!showResult) {
+      return isOptionSelected(option) ? 'selected' : 'default';
+    }
+    if (isOptionCorrect(option)) return 'correct';
+    if (isOptionSelected(option) && !isOptionCorrect(option)) return 'wrong';
+    return 'disabled';
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
-        <p className="text-lg font-medium text-gray-800 flex-1">{question.question}</p>
+        <p className="text-lg font-medium text-navy-900 flex-1">{question.question}</p>
         {question.hint && !showResult && (
           <button
             onClick={() => setShowHintState(!showHintState)}
-            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+            className="p-2 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
           >
             <HelpCircle className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      {showHintState && question.hint && (
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 flex items-start gap-2">
-          <Lightbulb className="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sky-700 text-sm">{question.hint}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {showHintState && question.hint && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-primary-50 border border-primary-200 rounded-xl p-3 flex items-start gap-2"
+          >
+            <Lightbulb className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
+            <p className="text-primary-700 text-sm">{question.hint}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <p className="text-sm text-gray-500 italic">Select all that apply</p>
+      <p className="text-sm text-navy-500 italic">Select all that apply</p>
 
-      <div className="space-y-2">
-        {question.options?.map((option, index) => {
-          const isSelected = isOptionSelected(option);
-          const isCorrectOption = isOptionCorrect(option);
-
-          let borderColor = 'border-gray-200';
-          let bgColor = 'bg-white';
-
-          if (showResult) {
-            if (isCorrectOption) {
-              borderColor = 'border-emerald-500';
-              bgColor = 'bg-emerald-50';
-            } else if (isSelected && !isCorrectOption) {
-              borderColor = 'border-red-400';
-              bgColor = 'bg-red-50';
-            }
-          } else if (isSelected) {
-            borderColor = 'border-blue-500';
-            bgColor = 'bg-blue-50';
-          }
-
-          return (
-            <button
-              key={index}
-              onClick={() => toggleOption(option)}
-              disabled={showResult}
-              className={`w-full text-left p-4 rounded-xl border-2 ${borderColor} ${bgColor} transition-all`}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                    showResult
-                      ? isCorrectOption
-                        ? 'border-emerald-500 bg-emerald-500'
-                        : isSelected
-                        ? 'border-red-400 bg-red-400'
-                        : 'border-gray-300'
-                      : isSelected
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-gray-300'
-                  }`}
-                >
-                  {(isSelected || (showResult && isCorrectOption)) && (
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                  )}
-                </div>
-                <span
-                  className={`font-medium ${
-                    showResult && isCorrectOption ? 'text-emerald-700' : 'text-gray-700'
-                  }`}
-                >
-                  {option}
-                </span>
-              </div>
-            </button>
-          );
-        })}
+      <div className="space-y-2.5">
+        {question.options?.map((option, index) => (
+          <AnswerButton
+            key={index}
+            label={option}
+            index={index}
+            state={getButtonState(option)}
+            onClick={() => toggleOption(option)}
+            disabled={showResult}
+          />
+        ))}
       </div>
 
       {!showResult ? (
-        <button
+        <ContinueButton
+          state={selected.length > 0 ? 'default' : 'disabled'}
+          label="Check Answer"
           onClick={handleSubmit}
-          disabled={selected.length === 0}
-          className={`w-full py-3 px-6 rounded-xl font-semibold transition-all ${
-            selected.length > 0
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg hover:shadow-xl'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Check Answer
-        </button>
+        />
       ) : (
         <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-primary-50 border border-primary-200"
+          >
             <div className="flex items-start gap-3">
-              <HelpCircle className="w-6 h-6 text-blue-500" />
+              <HelpCircle className="w-6 h-6 text-primary-500" />
               <div>
-                <p className="font-semibold text-blue-700">Explanation</p>
-                <p className="mt-1 text-sm text-blue-600">{question.explanation}</p>
+                <p className="font-semibold text-primary-700">Explanation</p>
+                <p className="mt-1 text-sm text-primary-600">{question.explanation}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           <button
             onClick={handleRetry}
-            className="w-full py-3 px-6 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
           >
             Continue
           </button>

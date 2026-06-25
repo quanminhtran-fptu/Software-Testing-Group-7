@@ -1,4 +1,4 @@
-import { Trophy, Star, Flame, Zap, Target, BookOpen, Award, Crown, Medal, Gift } from 'lucide-react';
+import { Trophy, Flame, Zap, Crown } from 'lucide-react';
 import { Achievement, Badge } from '../types/course';
 
 interface AchievementPopupProps {
@@ -189,7 +189,6 @@ interface LearningPathCardProps {
 export function LearningPathCard({
   title,
   description,
-  progress,
   totalLessons,
   completedLessons,
   icon,
