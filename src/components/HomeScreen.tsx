@@ -174,14 +174,12 @@ export function HomeScreen({
         </div>
       </motion.div>
 
-      {/* Horizontal Course Cards */}
-      <div className="mt-8">
-        <HorizontalCourseList
-          chapters={chapters}
-          completedLessons={completedLessons}
-          onStart={onStartLesson}
-        />
-      </div>
+      {/* Stacked Course Carousel */}
+      <HorizontalCourseList
+        chapters={chapters}
+        completedLessons={completedLessons}
+        onStart={onStartLesson}
+      />
 
       {/* Achievement preview section */}
       <motion.div

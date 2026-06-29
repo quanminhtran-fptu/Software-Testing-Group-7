@@ -1,3 +1,14 @@
+/**
+ * Vertical stacked course carousel — Apple Wallet / Duolingo style.
+ *
+ * Layout:  [prev peek] → [ACTIVE card] → [next peek]
+ * One card is always focused. Neighboring cards peek from top/bottom.
+ * Every visual property (translateY, scale, opacity, blur, shadow, brightness)
+ * interpolates continuously through spring physics during navigation.
+ *
+ * Interactions: drag, touch swipe, mouse wheel / trackpad, keyboard, buttons.
+ */
+
 import { useRef, useState, useEffect, useCallback } from 'react';
 import {
   motion,
@@ -9,98 +20,153 @@ import {
 import {
   BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
   CheckCircle2, Lock, Play, FileText, HelpCircle,
-  ChevronLeft, ChevronRight,
+  ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { Chapter, Lesson } from '../types/course';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Layout constants (pixels) ────────────────────────────────────────────────
+//
+// With CARD_H=500, PEEK=120, STRIDE=490:
+//   Next card center = active_center + 490
+//   Next card (scale 0.93) top = 490 - 0.93*250 = 257.5  (from active center)
+//   Container bottom = 500/2 + 120 = 370                  (from active center)
+//   Visible peek = 370 - 257.5 = 112px ≈ 24% of scaled card ✓
+//
+const CARD_H      = 500;  // full card height in px
+const PEEK_H      = 120;  // px of adjacent card visible above/below
+const CONTAINER_H = CARD_H + 2 * PEEK_H; // 740px
+const CARD_STRIDE = 490;  // distance between card centers (px)
+const CARD_TOP    = PEEK_H; // absolute top of each card within container
 
-const CARD_GAP = 20;
-const SNAP_VELOCITY = 400; // px/s threshold for flick-snap
-const SPRING = { stiffness: 380, damping: 42, mass: 1 } as const;
+// Spring spec from the PDF
+const SPRING = { type: 'spring' as const, stiffness: 280, damping: 28, mass: 0.8 };
+
+// ─── Theme palette ────────────────────────────────────────────────────────────
+
+const THEMES = [
+  { accent: '#6366f1', rgb: '99,102,241',  bgFrom: '#18182e', level: 'LEVEL 1' },
+  { accent: '#22c55e', rgb: '34,197,94',   bgFrom: '#121e16', level: 'LEVEL 2' },
+  { accent: '#f59e0b', rgb: '245,158,11',  bgFrom: '#1e1a10', level: 'LEVEL 3' },
+  { accent: '#38bdf8', rgb: '56,189,248',  bgFrom: '#101c24', level: 'LEVEL 4' },
+  { accent: '#f43f5e', rgb: '244,63,94',   bgFrom: '#1e1014', level: 'LEVEL 5' },
+  { accent: '#a855f7', rgb: '168,85,247',  bgFrom: '#1a1224', level: 'LEVEL 6' },
+] as const;
 
 const CHAPTER_ICONS: Record<string, React.ElementType> = {
   BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
 };
 
-const THEMES = [
-  { accent: '#6366f1', accentRgb: '99,102,241',  level: 'LEVEL 1' },
-  { accent: '#22c55e', accentRgb: '34,197,94',   level: 'LEVEL 2' },
-  { accent: '#f59e0b', accentRgb: '245,158,11',  level: 'LEVEL 3' },
-  { accent: '#38bdf8', accentRgb: '56,189,248',  level: 'LEVEL 4' },
-  { accent: '#f43f5e', accentRgb: '244,63,94',   level: 'LEVEL 5' },
-  { accent: '#a855f7', accentRgb: '168,85,247',  level: 'LEVEL 6' },
-] as const;
+// ─── useStackedCarousel ───────────────────────────────────────────────────────
 
-// ─── useCarousel hook ────────────────────────────────────────────────────────
+const DRAG_SENSITIVITY = 0.6; // multiplier: lower = easier to flick between cards
+const FLICK_VELOCITY_PX = 280; // px/s velocity threshold for flick detection
 
-function useCarousel(count: number) {
+function useStackedCarousel(count: number) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [stride, setStride] = useState(360);
-  const trackX = useMotionValue(0);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const activeRef    = useRef(0);
+  const progress     = useMotionValue(0);
+  const wheelLocked  = useRef(false);
+  const dragStartY   = useRef(0);
+  const dragStartP   = useRef(0);
+  const lastY        = useRef(0);
+  const lastTime     = useRef(0);
+  const velocityY    = useRef(0); // px/s, upward = positive
+  const isDragging   = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Stable refs so callbacks don't stale-close over state
-  const activeRef = useRef(0);
-  const strideRef = useRef(stride);
   activeRef.current = activeIndex;
-  strideRef.current = stride;
-
-  // Measure card dimensions and re-sync position on resize
-  useEffect(() => {
-    const measure = () => {
-      if (!cardRef.current) return;
-      const w = cardRef.current.getBoundingClientRect().width;
-      if (w <= 0) return;
-      const s = w + CARD_GAP;
-      strideRef.current = s;
-      setStride(s);
-      trackX.set(-activeRef.current * s);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (cardRef.current) ro.observe(cardRef.current);
-    return () => ro.disconnect();
-  }, [trackX]);
 
   const goTo = useCallback(
     (index: number) => {
       const clamped = Math.max(0, Math.min(count - 1, index));
       activeRef.current = clamped;
       setActiveIndex(clamped);
-      animate(trackX, -clamped * strideRef.current, { type: 'spring', ...SPRING });
+      animate(progress, clamped, SPRING);
     },
-    [count, trackX],
+    [count, progress],
   );
 
   const goNext = useCallback(() => goTo(activeRef.current + 1), [goTo]);
   const goPrev = useCallback(() => goTo(activeRef.current - 1), [goTo]);
 
-  const handleDragEnd = useCallback(
-    (velocityX: number) => {
-      const x = trackX.get();
-      let target = Math.round(-x / strideRef.current);
-      if (velocityX < -SNAP_VELOCITY) target = activeRef.current + 1;
-      if (velocityX >  SNAP_VELOCITY) target = activeRef.current - 1;
-      goTo(target);
-    },
-    [trackX, goTo],
-  );
-
-  // Keyboard navigation
+  // Keyboard
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') goNext();
-      else if (e.key === 'ArrowLeft') goPrev();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); goNext(); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); goPrev(); }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [goNext, goPrev]);
 
-  return { activeIndex, stride, trackX, goTo, goNext, goPrev, handleDragEnd, cardRef };
+  // Wheel / trackpad — one card per gesture group
+  const handleWheel = useCallback(
+    (e: WheelEvent) => {
+      e.preventDefault();
+      if (wheelLocked.current) return;
+      const dir = e.deltaY > 0 ? 1 : -1;
+      goTo(activeRef.current + dir);
+      wheelLocked.current = true;
+      setTimeout(() => { wheelLocked.current = false; }, 680);
+    },
+    [goTo],
+  );
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
+  // Pointer drag
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    isDragging.current = true;
+    dragStartY.current = e.clientY;
+    dragStartP.current = progress.get();
+    lastY.current      = e.clientY;
+    lastTime.current   = Date.now();
+    velocityY.current  = 0;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [progress]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging.current) return;
+
+    const now = Date.now();
+    const dt  = Math.max(1, now - lastTime.current);
+    velocityY.current = ((lastY.current - e.clientY) / dt) * 1000; // px/s upward positive
+    lastY.current  = e.clientY;
+    lastTime.current = now;
+
+    const delta = (dragStartY.current - e.clientY) * DRAG_SENSITIVITY;
+    const raw   = dragStartP.current + delta / CARD_STRIDE;
+    const lo = 0, hi = count - 1;
+    const elastic = raw < lo
+      ? lo + (raw - lo) * 0.14
+      : raw > hi
+      ? hi + (raw - hi) * 0.14
+      : raw;
+    progress.set(elastic);
+  }, [count, progress]);
+
+  const onPointerUp = useCallback((_e?: React.PointerEvent) => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    const current = progress.get();
+    let target = Math.round(current);
+    if (velocityY.current > FLICK_VELOCITY_PX)  target = Math.ceil(current);
+    if (velocityY.current < -FLICK_VELOCITY_PX) target = Math.floor(current);
+    goTo(target);
+  }, [progress, goTo]);
+
+  return {
+    activeIndex, progress, goTo, goNext, goPrev,
+    containerRef, onPointerDown, onPointerMove, onPointerUp,
+  };
 }
 
-// ─── LessonRow ───────────────────────────────────────────────────────────────
+// ─── LessonRow ────────────────────────────────────────────────────────────────
 
 function LessonRow({
   lesson,
@@ -119,194 +185,125 @@ function LessonRow({
   const Icon = lesson.type === 'quiz' ? HelpCircle : FileText;
 
   return (
-    <div className="flex items-center gap-3 py-2.5">
+    <div className="flex items-center gap-3 py-2">
       <div
-        className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center border-2"
+        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center border-2"
         style={
-          done
-            ? { background: '#22c55e22', borderColor: '#22c55e' }
-            : isNext
-            ? { background: accent + '28', borderColor: accent }
-            : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.12)' }
+          done    ? { background: '#22c55e20', borderColor: '#22c55e' } :
+          isNext  ? { background: accent + '25', borderColor: accent } :
+                    { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }
         }
       >
-        {done
-          ? <CheckCircle2 className="w-4 h-4 text-green-400" />
-          : isNext
-          ? <Icon className="w-4 h-4" style={{ color: accent }} />
-          : <Lock className="w-3.5 h-3.5 text-white/25" />}
+        {done   ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> :
+         isNext ? <Icon className="w-3.5 h-3.5" style={{ color: accent }} /> :
+                  <Lock className="w-3 h-3 text-white/20" />}
       </div>
 
       <span
-        className="flex-1 text-sm font-medium leading-tight"
-        style={{ color: done || isNext ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.32)' }}
+        className="flex-1 text-[13px] font-medium leading-tight"
+        style={{ color: done || isNext ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.28)' }}
       >
         {lesson.title}
       </span>
 
       <div
-        className="w-4 h-4 rounded-full flex-shrink-0"
+        className="w-3.5 h-3.5 rounded-full flex-shrink-0"
         style={
-          done
-            ? { background: '#22c55e', boxShadow: '0 0 8px #22c55e70' }
-            : isNext
-            ? { background: accent, boxShadow: `0 0 8px ${accent}70` }
-            : { background: 'rgba(255,255,255,0.1)' }
+          done    ? { background: '#22c55e', boxShadow: '0 0 6px #22c55e60' } :
+          isNext  ? { background: accent, boxShadow: `0 0 6px ${accent}60` } :
+                    { background: 'rgba(255,255,255,0.08)' }
         }
       />
     </div>
   );
 }
 
-// ─── CardIllustration ────────────────────────────────────────────────────────
+// ─── StackedCard ──────────────────────────────────────────────────────────────
+// Each card computes its own visual properties from the shared `progress` value.
+// No conditionals around hooks — every hook always fires in the same order.
 
-function CardIllustration({
-  Icon,
-  accent,
-  accentRgb,
-}: {
-  Icon: React.ElementType;
-  accent: string;
-  accentRgb: string;
-}) {
-  return (
-    <div
-      className="mx-6 rounded-2xl flex items-center justify-center py-8 relative overflow-hidden"
-      style={{ background: `rgba(${accentRgb}, 0.08)` }}
-    >
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `radial-gradient(ellipse at center, rgba(${accentRgb}, 0.16) 0%, transparent 70%)`,
-        }}
-      />
-      <motion.div
-        animate={{ y: [0, -6, 0] }}
-        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-        className="relative w-20 h-20 rounded-2xl flex items-center justify-center"
-        style={{
-          background: `rgba(${accentRgb}, 0.16)`,
-          border: `2px solid rgba(${accentRgb}, 0.28)`,
-          boxShadow: `0 8px 28px rgba(${accentRgb}, 0.22)`,
-        }}
-      >
-        <Icon className="w-10 h-10" style={{ color: accent }} />
-      </motion.div>
-    </div>
-  );
-}
-
-// ─── PaginationDot (own component = own hooks, no loop violation) ─────────────
-
-function PaginationDot({
-  index,
-  isActive,
-  trackX,
-  stride,
-  onClick,
-}: {
-  index: number;
-  isActive: boolean;
-  trackX: MotionValue<number>;
-  stride: number;
-  onClick: () => void;
-}) {
-  const dotOpacity = useTransform(trackX, (x) => {
-    const d = Math.abs((x + index * stride) / (stride || 360));
-    return Math.max(0.28, 1 - d * 0.72);
-  });
-
-  return (
-    <motion.button
-      onClick={onClick}
-      aria-label={`Go to chapter ${index + 1}`}
-      aria-selected={isActive}
-      role="tab"
-      animate={{ width: isActive ? 24 : 8 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-      style={{
-        height: 8,
-        background: isActive ? '#6366f1' : 'rgba(15,23,42,0.22)',
-        borderRadius: 4,
-        opacity: dotOpacity,
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-// ─── SessionCard ─────────────────────────────────────────────────────────────
-
-interface SessionCardProps {
+interface StackedCardProps {
   chapter: Chapter;
   index: number;
-  isActive: boolean;
+  activeIndex: number;
   completedLessons: Set<string>;
   onStart: (chapterId: number, lessonId: number) => void;
-  trackX: MotionValue<number>;
-  stride: number;
-  cardRef?: React.Ref<HTMLDivElement>;
+  progress: MotionValue<number>;
 }
 
-function SessionCard({
+function StackedCard({
   chapter,
   index,
-  isActive,
+  activeIndex,
   completedLessons,
   onStart,
-  trackX,
-  stride,
-  cardRef,
-}: SessionCardProps) {
+  progress,
+}: StackedCardProps) {
   const theme = THEMES[index % THEMES.length];
-  const Icon = CHAPTER_ICONS[chapter.icon] || BookOpen;
+  const Icon  = CHAPTER_ICONS[chapter.icon] || BookOpen;
 
-  const doneCount = chapter.lessons.filter(
-    (l) => completedLessons.has(`${chapter.id}-${l.id}`)
-  ).length;
-  const firstIncomplete = chapter.lessons.find(
-    (l) => !completedLessons.has(`${chapter.id}-${l.id}`)
-  );
-  const allDone = doneCount === chapter.lessons.length;
-  const targetLesson = firstIncomplete ?? chapter.lessons[0];
+  const doneCount     = chapter.lessons.filter(l => completedLessons.has(`${chapter.id}-${l.id}`)).length;
+  const firstIncomplete = chapter.lessons.find(l => !completedLessons.has(`${chapter.id}-${l.id}`));
+  const allDone       = doneCount === chapter.lessons.length;
+  const targetLesson  = firstIncomplete ?? chapter.lessons[0];
+  const ctaLabel      = allDone ? 'Review' : doneCount > 0 ? 'Continue' : 'Start';
 
-  // Per-card motion transforms — hooks always called (no conditionals)
-  const scale = useTransform(trackX, (x) => {
-    const d = Math.abs((x + index * stride) / (stride || 360));
-    return Math.max(0.83, 1 - d * 0.14);
+  // All transforms derived from the shared progress MotionValue
+  const translateY = useTransform(progress, (p) => (index - p) * CARD_STRIDE);
+  const scale      = useTransform(progress, (p) => Math.max(0.82, 1 - Math.abs(index - p) * 0.07));
+  const opacity    = useTransform(progress, (p) => Math.max(0.0,  1 - Math.abs(index - p) * 0.58));
+  const filter     = useTransform(progress, (p) => {
+    const d = Math.abs(index - p);
+    const blur       = Math.min(8, d * 4.2);
+    const brightness = Math.max(0.55, 1 - d * 0.25);
+    return `blur(${blur.toFixed(2)}px) brightness(${brightness.toFixed(3)})`;
   });
-  const opacity = useTransform(trackX, (x) => {
-    const d = Math.abs((x + index * stride) / (stride || 360));
-    return Math.max(0.42, 1 - d * 0.44);
+  const boxShadow  = useTransform(progress, (p) => {
+    const d = Math.abs(index - p);
+    const a = Math.max(0, 0.35 - d * 0.18);
+    const spread = Math.max(16, 60 - d * 36);
+    return `0 24px ${spread}px rgba(0,0,0,${a.toFixed(3)}), 0 0 0 1px rgba(${theme.rgb},${Math.max(0, 0.14 - d * 0.14).toFixed(3)})`;
   });
 
-  const ctaLabel = allDone ? 'Review' : doneCount > 0 ? 'Continue' : 'Start';
+  // Discrete z-index from activeIndex (not animatable)
+  const zIndex = Math.max(0, 10 - Math.abs(index - activeIndex));
+  const isActive = index === activeIndex;
 
   return (
     <motion.div
-      ref={cardRef}
-      style={{ scale, opacity }}
-      className="flex-shrink-0 w-[min(340px,82vw)] rounded-3xl overflow-hidden will-change-transform"
-      aria-roledescription="slide"
-      aria-label={`Chapter ${index + 1}: ${chapter.title}`}
+      style={{
+        position: 'absolute',
+        top: CARD_TOP,
+        left: '50%',
+        width: 'min(360px, 88vw)',
+        height: CARD_H,
+        translateX: '-50%',
+        translateY,
+        scale,
+        opacity,
+        filter,
+        boxShadow,
+        zIndex,
+        willChange: 'transform, opacity, filter',
+        pointerEvents: isActive ? 'auto' : 'none',
+      }}
+      aria-hidden={!isActive}
     >
+      {/* Card surface */}
       <div
-        className="rounded-3xl overflow-hidden h-full"
+        className="w-full h-full rounded-3xl overflow-hidden flex flex-col"
         style={{
-          background: 'linear-gradient(160deg, #1e2232 0%, #12141e 100%)',
+          background: `linear-gradient(165deg, ${theme.bgFrom} 0%, #0d0d14 100%)`,
           border: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: isActive
-            ? `0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(${theme.accentRgb}, 0.12)`
-            : '0 12px 32px rgba(0,0,0,0.35)',
         }}
       >
         {/* Header */}
-        <div className="pt-7 pb-4 px-6 text-center">
-          <h3 className="text-[17px] font-bold text-white leading-tight tracking-tight">
+        <div className="pt-6 pb-3 px-6 text-center flex-shrink-0">
+          <h3 className="text-[18px] font-bold text-white leading-tight tracking-tight">
             {chapter.title}
           </h3>
           <span
-            className="text-[10px] font-bold tracking-[0.22em] mt-1.5 block uppercase"
+            className="text-[10px] font-extrabold tracking-[0.22em] mt-1 block uppercase"
             style={{ color: theme.accent }}
           >
             {theme.level}
@@ -314,14 +311,32 @@ function SessionCard({
         </div>
 
         {/* Illustration */}
-        <CardIllustration Icon={Icon} accent={theme.accent} accentRgb={theme.accentRgb} />
+        <div
+          className="mx-6 rounded-2xl flex items-center justify-center py-5 flex-shrink-0 relative overflow-hidden"
+          style={{ background: `rgba(${theme.rgb}, 0.08)` }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{ background: `radial-gradient(ellipse at center, rgba(${theme.rgb},0.15) 0%, transparent 68%)` }}
+          />
+          <motion.div
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+            className="relative w-16 h-16 rounded-xl flex items-center justify-center"
+            style={{
+              background: `rgba(${theme.rgb},0.16)`,
+              border: `1.5px solid rgba(${theme.rgb},0.3)`,
+              boxShadow: `0 6px 24px rgba(${theme.rgb},0.22)`,
+            }}
+          >
+            <Icon className="w-8 h-8" style={{ color: theme.accent }} />
+          </motion.div>
+        </div>
 
         {/* Lesson list */}
-        <div className="px-6 pt-3 pb-1 divide-y divide-white/[0.05]">
+        <div className="flex-1 px-6 pt-2 pb-0 overflow-hidden divide-y divide-white/[0.05]">
           {chapter.lessons.map((lesson, li) => {
-            const prevDone =
-              li === 0 ||
-              completedLessons.has(`${chapter.id}-${chapter.lessons[li - 1].id}`);
+            const prevDone = li === 0 || completedLessons.has(`${chapter.id}-${chapter.lessons[li - 1].id}`);
             return (
               <LessonRow
                 key={lesson.id}
@@ -335,22 +350,22 @@ function SessionCard({
           })}
         </div>
 
-        {/* CTA */}
-        <div className="px-6 pt-4 pb-7">
+        {/* CTA Button */}
+        <div className="px-6 pt-3 pb-6 flex-shrink-0">
           <motion.button
-            whileHover={{ scale: 1.025 }}
-            whileTap={{ scale: 0.965 }}
+            whileHover={{ scale: 1.018, filter: 'brightness(1.1)' }}
+            whileTap={{ scale: 0.97 }}
+            transition={SPRING}
             onClick={() => onStart(chapter.id, targetLesson.id)}
             className="w-full py-[14px] rounded-2xl font-bold text-white text-sm relative overflow-hidden"
             style={{
               background: `linear-gradient(130deg, ${theme.accent}, ${theme.accent}bb)`,
-              boxShadow: `0 ${isActive ? 8 : 4}px ${isActive ? 28 : 14}px rgba(${theme.accentRgb}, ${isActive ? 0.42 : 0.22})`,
+              boxShadow: `0 6px 22px rgba(${theme.rgb}, 0.38)`,
             }}
-            aria-label={`${ctaLabel} ${chapter.title}`}
           >
             <span
               className="absolute inset-0 rounded-2xl pointer-events-none"
-              style={{ background: 'linear-gradient(115deg, rgba(255,255,255,0.16) 0%, transparent 52%)' }}
+              style={{ background: 'linear-gradient(115deg, rgba(255,255,255,0.18) 0%, transparent 50%)' }}
             />
             <span className="relative flex items-center justify-center gap-2">
               <Play className="w-3.5 h-3.5 fill-white" />
@@ -363,7 +378,56 @@ function SessionCard({
   );
 }
 
-// ─── HorizontalCourseList (root carousel) ────────────────────────────────────
+// ─── CarouselBackground ───────────────────────────────────────────────────────
+
+function CarouselBackground({ activeIndex, count }: { activeIndex: number; count: number }) {
+  const theme = THEMES[activeIndex % THEMES.length];
+  return (
+    <motion.div
+      key={activeIndex}
+      className="absolute inset-0"
+      animate={{ opacity: 1 }}
+      initial={{ opacity: 0 }}
+      transition={{ duration: 0.4 }}
+      style={{
+        background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(${theme.rgb},0.22) 0%, transparent 70%)`,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+// ─── PaginationDot ────────────────────────────────────────────────────────────
+
+function PaginationDot({
+  index,
+  isActive,
+  progress,
+  onClick,
+}: {
+  index: number;
+  isActive: boolean;
+  progress: MotionValue<number>;
+  onClick: () => void;
+}) {
+  const dotOpacity = useTransform(progress, (p) => Math.max(0.25, 1 - Math.abs(p - index) * 0.75));
+  return (
+    <motion.button
+      onClick={onClick}
+      animate={{ height: isActive ? 24 : 8 }}
+      transition={SPRING}
+      aria-label={`Go to chapter ${index + 1}`}
+      aria-current={isActive ? 'true' : undefined}
+      className="w-2 rounded-full"
+      style={{
+        background: isActive ? '#ffffff' : 'rgba(255,255,255,0.35)',
+        opacity: dotOpacity,
+      } as React.CSSProperties}
+    />
+  );
+}
+
+// ─── HorizontalCourseList (public API unchanged) ──────────────────────────────
 
 export interface HorizontalCourseListProps {
   chapters: Chapter[];
@@ -378,87 +442,121 @@ export function HorizontalCourseList({
   onStart,
   title = 'Course Chapters',
 }: HorizontalCourseListProps) {
-  const { activeIndex, stride, trackX, goTo, goNext, goPrev, handleDragEnd, cardRef } =
-    useCarousel(chapters.length);
+  const {
+    activeIndex,
+    progress,
+    goTo,
+    goNext,
+    goPrev,
+    containerRef,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+  } = useStackedCarousel(chapters.length);
 
-  const dragLeft  = -(chapters.length - 1) * stride;
-  const dragRight = 0;
+  const activeTheme = THEMES[activeIndex % THEMES.length];
 
   return (
-    <section className="py-8" aria-label={title} aria-roledescription="carousel">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto px-6 mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-navy-900">{title}</h2>
+    <section
+      className="relative w-full select-none"
+      aria-label={title}
+      aria-roledescription="carousel"
+      style={{ background: '#0a0a12' }}
+    >
+      {/* Animated background gradient transitions with active card */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0" style={{ background: '#0a0a12' }} />
+        <CarouselBackground activeIndex={activeIndex} count={chapters.length} />
+      </div>
+
+      {/* Header row */}
+      <div className="relative z-20 flex items-center justify-between px-6 pt-8 pb-4">
+        <h2 className="text-xl font-bold text-white/90">{title}</h2>
+
         <div className="flex gap-2">
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
             onClick={goPrev}
             disabled={activeIndex === 0}
-            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 disabled:opacity-30 transition-colors flex items-center justify-center"
+            className="w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-25"
+            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
             aria-label="Previous chapter"
           >
-            <ChevronLeft className="w-5 h-5 text-navy-600" />
+            <ChevronUp className="w-5 h-5 text-white" />
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
             onClick={goNext}
             disabled={activeIndex === chapters.length - 1}
-            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 disabled:opacity-30 transition-colors flex items-center justify-center"
+            className="w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-25"
+            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
             aria-label="Next chapter"
           >
-            <ChevronRight className="w-5 h-5 text-navy-600" />
+            <ChevronDown className="w-5 h-5 text-white" />
           </motion.button>
         </div>
       </div>
 
-      {/* Carousel viewport — overflow hidden clips side-cards */}
-      <div
-        className="overflow-hidden px-6 cursor-grab active:cursor-grabbing"
-        role="list"
-      >
-        <motion.div
-          className="flex"
-          style={{ x: trackX, gap: CARD_GAP }}
-          drag="x"
-          dragConstraints={{ left: dragLeft, right: dragRight }}
-          dragElastic={0.10}
-          dragMomentum={false}
-          onDragEnd={(_, info) => handleDragEnd(info.velocity.x)}
+      {/* Carousel drag zone */}
+      <div className="relative z-10 flex">
+        {/* Card stack container */}
+        <div
+          ref={containerRef}
+          className="relative flex-1 cursor-grab active:cursor-grabbing touch-none"
+          style={{ height: CONTAINER_H, overflow: 'hidden' }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+          role="list"
+          tabIndex={0}
+          aria-label={`${chapters.length} chapters, currently on chapter ${activeIndex + 1}`}
         >
           {chapters.map((chapter, index) => (
-            <SessionCard
+            <StackedCard
               key={chapter.id}
               chapter={chapter}
               index={index}
-              isActive={index === activeIndex}
+              activeIndex={activeIndex}
               completedLessons={completedLessons}
               onStart={onStart}
-              trackX={trackX}
-              stride={stride}
-              cardRef={index === 0 ? cardRef : undefined}
+              progress={progress}
             />
           ))}
-        </motion.div>
+        </div>
+
+        {/* Pagination — vertical dots on the right */}
+        <div
+          className="flex flex-col items-center justify-center gap-2 pr-4"
+          role="tablist"
+          aria-label="Chapter navigation"
+        >
+          {chapters.map((_, i) => (
+            <PaginationDot
+              key={i}
+              index={i}
+              isActive={i === activeIndex}
+              progress={progress}
+              onClick={() => goTo(i)}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Pagination dots */}
-      <div
-        className="flex items-center justify-center gap-2 mt-6"
-        role="tablist"
-        aria-label="Chapter pagination"
-      >
-        {chapters.map((_, i) => (
-          <PaginationDot
-            key={i}
-            index={i}
-            isActive={i === activeIndex}
-            trackX={trackX}
-            stride={stride}
-            onClick={() => goTo(i)}
-          />
-        ))}
+      {/* Active chapter label */}
+      <div className="relative z-20 text-center pb-8 pt-2">
+        <motion.p
+          key={activeIndex}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={SPRING}
+          className="text-sm font-medium"
+          style={{ color: activeTheme.accent }}
+        >
+          {activeIndex + 1} / {chapters.length}
+        </motion.p>
       </div>
     </section>
   );
