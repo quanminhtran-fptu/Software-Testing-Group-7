@@ -1,113 +1,176 @@
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Layers, Search, PenTool, ClipboardList, Wrench, ChevronRight, CheckCircle2 } from 'lucide-react';
-import { Chapter } from '../types/course';
-import { fadeInUp } from './animations';
+import {
+  BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
+  ChevronLeft, ChevronRight, CheckCircle2, Lock, Play, FileText, HelpCircle,
+} from 'lucide-react';
+import { Chapter, Lesson } from '../types/course';
 
 const chapterIcons: Record<string, React.ElementType> = {
-  BookOpen,
-  Layers,
-  Search,
-  PenTool,
-  ClipboardList,
-  Wrench,
+  BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
 };
 
-const gradients = [
-  'from-primary-500 to-primary-600',
-  'from-success-500 to-success-600',
-  'from-amber-500 to-orange-600',
-  'from-sky-500 to-cyan-600',
-  'from-rose-500 to-pink-600',
-  'from-violet-500 to-purple-600',
+const chapterThemes = [
+  { bg: 'from-slate-800 to-slate-900', accent: '#6366f1', accentLight: 'rgba(99,102,241,0.15)', level: 'LEVEL 1' },
+  { bg: 'from-slate-800 to-slate-900', accent: '#22c55e', accentLight: 'rgba(34,197,94,0.15)', level: 'LEVEL 2' },
+  { bg: 'from-slate-800 to-slate-900', accent: '#f59e0b', accentLight: 'rgba(245,158,11,0.15)', level: 'LEVEL 3' },
+  { bg: 'from-slate-800 to-slate-900', accent: '#38bdf8', accentLight: 'rgba(56,189,248,0.15)', level: 'LEVEL 4' },
+  { bg: 'from-slate-800 to-slate-900', accent: '#f43f5e', accentLight: 'rgba(244,63,94,0.15)', level: 'LEVEL 5' },
+  { bg: 'from-slate-800 to-slate-900', accent: '#a855f7', accentLight: 'rgba(168,85,247,0.15)', level: 'LEVEL 6' },
 ];
 
-interface CourseCardProps {
+function LessonRow({
+  lesson,
+  chapterId,
+  completedLessons,
+  isFirst,
+}: {
+  lesson: Lesson;
+  chapterId: number;
+  completedLessons: Set<string>;
+  isFirst: boolean;
+}) {
+  const key = `${chapterId}-${lesson.id}`;
+  const done = completedLessons.has(key);
+  const LessonIcon = lesson.type === 'quiz' ? HelpCircle : FileText;
+
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      {/* Avatar circle */}
+      <div
+        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border-2"
+        style={
+          done
+            ? { background: '#22c55e22', borderColor: '#22c55e' }
+            : isFirst
+            ? { background: 'rgba(99,102,241,0.18)', borderColor: '#6366f1' }
+            : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)' }
+        }
+      >
+        {done ? (
+          <CheckCircle2 className="w-4 h-4 text-green-400" />
+        ) : isFirst ? (
+          <LessonIcon className="w-4 h-4 text-indigo-400" />
+        ) : (
+          <Lock className="w-3.5 h-3.5 text-white/30" />
+        )}
+      </div>
+
+      {/* Title */}
+      <span
+        className="flex-1 text-sm font-medium leading-tight"
+        style={done ? { color: '#fff' } : isFirst ? { color: '#fff' } : { color: 'rgba(255,255,255,0.4)' }}
+      >
+        {lesson.title}
+      </span>
+
+      {/* Status dot */}
+      <div
+        className="w-5 h-5 rounded-full flex-shrink-0"
+        style={
+          done
+            ? { background: '#22c55e', boxShadow: '0 0 6px #22c55e80' }
+            : isFirst
+            ? { background: '#6366f1', boxShadow: '0 0 6px #6366f180' }
+            : { background: 'rgba(255,255,255,0.12)' }
+        }
+      />
+    </div>
+  );
+}
+
+interface SessionCardProps {
   chapter: Chapter;
   index: number;
   completedLessons: Set<string>;
   onStart: (chapterId: number, lessonId: number) => void;
 }
 
-// Horizontal scrollable course card with hover glow and progress indicator
-export function CourseCard({ chapter, index, completedLessons, onStart }: CourseCardProps) {
+function SessionCard({ chapter, index, completedLessons, onStart }: SessionCardProps) {
+  const theme = chapterThemes[index % chapterThemes.length];
   const IconComponent = chapterIcons[chapter.icon] || BookOpen;
-  const gradient = gradients[index % gradients.length];
-  const chapterCompleted = chapter.lessons.filter((l) =>
-    completedLessons.has(`${chapter.id}-${l.id}`)
+
+  const chapterDone = chapter.lessons.filter(
+    (l) => completedLessons.has(`${chapter.id}-${l.id}`)
   ).length;
-  const totalLessons = chapter.lessons.length;
-  const completionPercent = Math.round((chapterCompleted / totalLessons) * 100);
-  const isComplete = chapterCompleted === totalLessons;
   const firstIncomplete = chapter.lessons.find(
     (l) => !completedLessons.has(`${chapter.id}-${l.id}`)
   );
+  const allDone = chapterDone === chapter.lessons.length;
+
+  const targetLesson = firstIncomplete || chapter.lessons[0];
 
   return (
     <motion.div
-      variants={fadeInUp}
-      whileHover={{ scale: 1.05, y: -4 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-      onClick={() => onStart(chapter.id, firstIncomplete?.id || chapter.lessons[0].id)}
-      className="snap-start flex-shrink-0 w-72 bg-white rounded-3xl overflow-hidden cursor-pointer group"
-      style={{ boxShadow: '0 4px 16px rgba(15, 23, 42, 0.06)' }}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.07, duration: 0.35 }}
+      className={`snap-center flex-shrink-0 w-[min(340px,82vw)] rounded-3xl overflow-hidden bg-gradient-to-b ${theme.bg} select-none`}
+      style={{
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+      }}
     >
-      {/* Hover glow border */}
-      <div className="relative">
-        <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl blur-xl`} />
+      {/* Card header */}
+      <div className="pt-7 pb-4 px-6 text-center">
+        <h3 className="text-xl font-bold text-white leading-tight">{chapter.title}</h3>
+        <span className="text-xs font-bold tracking-widest mt-1 block" style={{ color: theme.accent }}>
+          {theme.level}
+        </span>
+      </div>
 
-        {/* Card header with gradient */}
-        <div className={`relative h-32 bg-gradient-to-br ${gradient} overflow-hidden`}>
-          <div className="absolute inset-0 bg-black/5" />
-          <div className="absolute top-4 right-4">
-            {isComplete ? (
-              <div className="w-7 h-7 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4 text-white" />
-              </div>
-            ) : (
-              <span className="text-xs font-bold text-white/90 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full">
-                {completionPercent}%
-              </span>
-            )}
-          </div>
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="flex items-center gap-2 text-white/90 text-xs mb-2">
-              <IconComponent className="w-3.5 h-3.5" />
-              <span>Chapter {chapter.id}</span>
-            </div>
-            {/* Progress dots */}
-            <div className="flex gap-1">
-              {[...Array(totalLessons)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`h-1 flex-1 rounded-full transition-colors ${
-                    i < chapterCompleted ? 'bg-white' : 'bg-white/30'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-          {/* Decorative circles */}
-          <div className="absolute -top-8 -right-8 w-24 h-24 bg-white/10 rounded-full" />
-          <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-white/10 rounded-full" />
+      {/* Illustration area */}
+      <div className="mx-6 rounded-2xl overflow-hidden flex items-center justify-center py-8" style={{ background: theme.accentLight }}>
+        <div
+          className="w-20 h-20 rounded-2xl flex items-center justify-center"
+          style={{ background: theme.accent + '30', border: `2px solid ${theme.accent}40` }}
+        >
+          <IconComponent className="w-10 h-10" style={{ color: theme.accent }} />
         </div>
       </div>
 
-      {/* Card body */}
-      <div className="p-5">
-        <h3 className="font-bold text-navy-900 mb-1.5 line-clamp-1 group-hover:text-primary-600 transition-colors">
-          {chapter.title}
-        </h3>
-        <p className="text-navy-500 text-sm mb-4 line-clamp-2 leading-relaxed">{chapter.description}</p>
+      {/* Lessons list */}
+      <div className="px-6 pt-4 pb-2 divide-y divide-white/5">
+        {chapter.lessons.map((lesson, li) => {
+          const isAccessible =
+            li === 0 ||
+            completedLessons.has(`${chapter.id}-${chapter.lessons[li - 1].id}`);
+          const isFirst = lesson === firstIncomplete && isAccessible;
 
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-navy-400 font-medium">
-            {chapterCompleted}/{totalLessons} lessons
+          return (
+            <LessonRow
+              key={lesson.id}
+              lesson={lesson}
+              chapterId={chapter.id}
+              completedLessons={completedLessons}
+              isFirst={isFirst}
+            />
+          );
+        })}
+      </div>
+
+      {/* Start button */}
+      <div className="px-6 pt-4 pb-7">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => onStart(chapter.id, targetLesson.id)}
+          className="w-full py-4 rounded-2xl font-bold text-white text-base relative overflow-hidden"
+          style={{
+            background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent}cc)`,
+            boxShadow: `0 4px 20px ${theme.accent}55`,
+          }}
+        >
+          {/* Shine overlay */}
+          <span
+            className="absolute inset-0 rounded-2xl pointer-events-none"
+            style={{ background: 'linear-gradient(120deg, rgba(255,255,255,0.15) 0%, transparent 60%)' }}
+          />
+          <span className="relative flex items-center justify-center gap-2">
+            <Play className="w-4 h-4 fill-white" />
+            {allDone ? 'Review' : chapterDone > 0 ? 'Continue' : 'Start'}
           </span>
-          <div className="flex items-center gap-1 text-primary-600 text-sm font-semibold group-hover:gap-2 transition-all">
-            {firstIncomplete ? 'Start' : 'Review'}
-            <ChevronRight className="w-4 h-4" />
-          </div>
-        </div>
+        </motion.button>
       </div>
     </motion.div>
   );
@@ -120,22 +183,57 @@ interface HorizontalCourseListProps {
   title?: string;
 }
 
-// Horizontal scroll container with snap scrolling
 export function HorizontalCourseList({
   chapters,
   completedLessons,
   onStart,
   title = 'Course Chapters',
 }: HorizontalCourseListProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === 'right' ? 360 : -360, behavior: 'smooth' });
+  };
+
   return (
     <div className="py-8">
-      <div className="max-w-7xl mx-auto px-6 mb-6">
+      {/* Header row */}
+      <div className="max-w-7xl mx-auto px-6 mb-5 flex items-center justify-between">
         <h2 className="text-2xl font-bold text-navy-900">{title}</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => scroll('left')}
+            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 transition-colors flex items-center justify-center"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-5 h-5 text-navy-600" />
+          </button>
+          <button
+            onClick={() => scroll('right')}
+            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 transition-colors flex items-center justify-center"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-5 h-5 text-navy-600" />
+          </button>
+        </div>
       </div>
-      <div className="overflow-x-auto scrollbar-hide snap-x-mandatory pb-4">
+
+      {/* Scroll container */}
+      <div
+        ref={scrollRef}
+        className="overflow-x-auto pb-4"
+        style={{
+          scrollSnapType: 'x mandatory',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         <div className="flex gap-5 px-6 max-w-7xl mx-auto">
           {chapters.map((chapter, index) => (
-            <CourseCard
+            <SessionCard
               key={chapter.id}
               chapter={chapter}
               index={index}
@@ -143,8 +241,13 @@ export function HorizontalCourseList({
               onStart={onStart}
             />
           ))}
+          {/* Trailing space so last card snaps cleanly */}
+          <div className="flex-shrink-0 w-4" />
         </div>
       </div>
     </div>
   );
 }
+
+// Keep named export for legacy imports
+export { SessionCard as CourseCard };
