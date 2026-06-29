@@ -1,182 +1,371 @@
-import { useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import {
+  motion,
+  useMotionValue,
+  useTransform,
+  animate,
+  MotionValue,
+} from 'framer-motion';
 import {
   BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
-  ChevronLeft, ChevronRight, CheckCircle2, Lock, Play, FileText, HelpCircle,
+  CheckCircle2, Lock, Play, FileText, HelpCircle,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Chapter, Lesson } from '../types/course';
 
-const chapterIcons: Record<string, React.ElementType> = {
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const CARD_GAP = 20;
+const SNAP_VELOCITY = 400; // px/s threshold for flick-snap
+const SPRING = { stiffness: 380, damping: 42, mass: 1 } as const;
+
+const CHAPTER_ICONS: Record<string, React.ElementType> = {
   BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
 };
 
-const chapterThemes = [
-  { bg: 'from-slate-800 to-slate-900', accent: '#6366f1', accentLight: 'rgba(99,102,241,0.15)', level: 'LEVEL 1' },
-  { bg: 'from-slate-800 to-slate-900', accent: '#22c55e', accentLight: 'rgba(34,197,94,0.15)', level: 'LEVEL 2' },
-  { bg: 'from-slate-800 to-slate-900', accent: '#f59e0b', accentLight: 'rgba(245,158,11,0.15)', level: 'LEVEL 3' },
-  { bg: 'from-slate-800 to-slate-900', accent: '#38bdf8', accentLight: 'rgba(56,189,248,0.15)', level: 'LEVEL 4' },
-  { bg: 'from-slate-800 to-slate-900', accent: '#f43f5e', accentLight: 'rgba(244,63,94,0.15)', level: 'LEVEL 5' },
-  { bg: 'from-slate-800 to-slate-900', accent: '#a855f7', accentLight: 'rgba(168,85,247,0.15)', level: 'LEVEL 6' },
-];
+const THEMES = [
+  { accent: '#6366f1', accentRgb: '99,102,241',  level: 'LEVEL 1' },
+  { accent: '#22c55e', accentRgb: '34,197,94',   level: 'LEVEL 2' },
+  { accent: '#f59e0b', accentRgb: '245,158,11',  level: 'LEVEL 3' },
+  { accent: '#38bdf8', accentRgb: '56,189,248',  level: 'LEVEL 4' },
+  { accent: '#f43f5e', accentRgb: '244,63,94',   level: 'LEVEL 5' },
+  { accent: '#a855f7', accentRgb: '168,85,247',  level: 'LEVEL 6' },
+] as const;
+
+// ─── useCarousel hook ────────────────────────────────────────────────────────
+
+function useCarousel(count: number) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [stride, setStride] = useState(360);
+  const trackX = useMotionValue(0);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Stable refs so callbacks don't stale-close over state
+  const activeRef = useRef(0);
+  const strideRef = useRef(stride);
+  activeRef.current = activeIndex;
+  strideRef.current = stride;
+
+  // Measure card dimensions and re-sync position on resize
+  useEffect(() => {
+    const measure = () => {
+      if (!cardRef.current) return;
+      const w = cardRef.current.getBoundingClientRect().width;
+      if (w <= 0) return;
+      const s = w + CARD_GAP;
+      strideRef.current = s;
+      setStride(s);
+      trackX.set(-activeRef.current * s);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (cardRef.current) ro.observe(cardRef.current);
+    return () => ro.disconnect();
+  }, [trackX]);
+
+  const goTo = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(count - 1, index));
+      activeRef.current = clamped;
+      setActiveIndex(clamped);
+      animate(trackX, -clamped * strideRef.current, { type: 'spring', ...SPRING });
+    },
+    [count, trackX],
+  );
+
+  const goNext = useCallback(() => goTo(activeRef.current + 1), [goTo]);
+  const goPrev = useCallback(() => goTo(activeRef.current - 1), [goTo]);
+
+  const handleDragEnd = useCallback(
+    (velocityX: number) => {
+      const x = trackX.get();
+      let target = Math.round(-x / strideRef.current);
+      if (velocityX < -SNAP_VELOCITY) target = activeRef.current + 1;
+      if (velocityX >  SNAP_VELOCITY) target = activeRef.current - 1;
+      goTo(target);
+    },
+    [trackX, goTo],
+  );
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') goNext();
+      else if (e.key === 'ArrowLeft') goPrev();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goNext, goPrev]);
+
+  return { activeIndex, stride, trackX, goTo, goNext, goPrev, handleDragEnd, cardRef };
+}
+
+// ─── LessonRow ───────────────────────────────────────────────────────────────
 
 function LessonRow({
   lesson,
   chapterId,
   completedLessons,
-  isFirst,
+  isNext,
+  accent,
 }: {
   lesson: Lesson;
   chapterId: number;
   completedLessons: Set<string>;
-  isFirst: boolean;
+  isNext: boolean;
+  accent: string;
 }) {
-  const key = `${chapterId}-${lesson.id}`;
-  const done = completedLessons.has(key);
-  const LessonIcon = lesson.type === 'quiz' ? HelpCircle : FileText;
+  const done = completedLessons.has(`${chapterId}-${lesson.id}`);
+  const Icon = lesson.type === 'quiz' ? HelpCircle : FileText;
 
   return (
     <div className="flex items-center gap-3 py-2.5">
-      {/* Avatar circle */}
       <div
-        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border-2"
+        className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center border-2"
         style={
           done
             ? { background: '#22c55e22', borderColor: '#22c55e' }
-            : isFirst
-            ? { background: 'rgba(99,102,241,0.18)', borderColor: '#6366f1' }
-            : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)' }
+            : isNext
+            ? { background: accent + '28', borderColor: accent }
+            : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.12)' }
         }
       >
-        {done ? (
-          <CheckCircle2 className="w-4 h-4 text-green-400" />
-        ) : isFirst ? (
-          <LessonIcon className="w-4 h-4 text-indigo-400" />
-        ) : (
-          <Lock className="w-3.5 h-3.5 text-white/30" />
-        )}
+        {done
+          ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+          : isNext
+          ? <Icon className="w-4 h-4" style={{ color: accent }} />
+          : <Lock className="w-3.5 h-3.5 text-white/25" />}
       </div>
 
-      {/* Title */}
       <span
         className="flex-1 text-sm font-medium leading-tight"
-        style={done ? { color: '#fff' } : isFirst ? { color: '#fff' } : { color: 'rgba(255,255,255,0.4)' }}
+        style={{ color: done || isNext ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.32)' }}
       >
         {lesson.title}
       </span>
 
-      {/* Status dot */}
       <div
-        className="w-5 h-5 rounded-full flex-shrink-0"
+        className="w-4 h-4 rounded-full flex-shrink-0"
         style={
           done
-            ? { background: '#22c55e', boxShadow: '0 0 6px #22c55e80' }
-            : isFirst
-            ? { background: '#6366f1', boxShadow: '0 0 6px #6366f180' }
-            : { background: 'rgba(255,255,255,0.12)' }
+            ? { background: '#22c55e', boxShadow: '0 0 8px #22c55e70' }
+            : isNext
+            ? { background: accent, boxShadow: `0 0 8px ${accent}70` }
+            : { background: 'rgba(255,255,255,0.1)' }
         }
       />
     </div>
   );
 }
 
+// ─── CardIllustration ────────────────────────────────────────────────────────
+
+function CardIllustration({
+  Icon,
+  accent,
+  accentRgb,
+}: {
+  Icon: React.ElementType;
+  accent: string;
+  accentRgb: string;
+}) {
+  return (
+    <div
+      className="mx-6 rounded-2xl flex items-center justify-center py-8 relative overflow-hidden"
+      style={{ background: `rgba(${accentRgb}, 0.08)` }}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(ellipse at center, rgba(${accentRgb}, 0.16) 0%, transparent 70%)`,
+        }}
+      />
+      <motion.div
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+        className="relative w-20 h-20 rounded-2xl flex items-center justify-center"
+        style={{
+          background: `rgba(${accentRgb}, 0.16)`,
+          border: `2px solid rgba(${accentRgb}, 0.28)`,
+          boxShadow: `0 8px 28px rgba(${accentRgb}, 0.22)`,
+        }}
+      >
+        <Icon className="w-10 h-10" style={{ color: accent }} />
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── PaginationDot (own component = own hooks, no loop violation) ─────────────
+
+function PaginationDot({
+  index,
+  isActive,
+  trackX,
+  stride,
+  onClick,
+}: {
+  index: number;
+  isActive: boolean;
+  trackX: MotionValue<number>;
+  stride: number;
+  onClick: () => void;
+}) {
+  const dotOpacity = useTransform(trackX, (x) => {
+    const d = Math.abs((x + index * stride) / (stride || 360));
+    return Math.max(0.28, 1 - d * 0.72);
+  });
+
+  return (
+    <motion.button
+      onClick={onClick}
+      aria-label={`Go to chapter ${index + 1}`}
+      aria-selected={isActive}
+      role="tab"
+      animate={{ width: isActive ? 24 : 8 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+      style={{
+        height: 8,
+        background: isActive ? '#6366f1' : 'rgba(15,23,42,0.22)',
+        borderRadius: 4,
+        opacity: dotOpacity,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+// ─── SessionCard ─────────────────────────────────────────────────────────────
+
 interface SessionCardProps {
   chapter: Chapter;
   index: number;
+  isActive: boolean;
   completedLessons: Set<string>;
   onStart: (chapterId: number, lessonId: number) => void;
+  trackX: MotionValue<number>;
+  stride: number;
+  cardRef?: React.Ref<HTMLDivElement>;
 }
 
-function SessionCard({ chapter, index, completedLessons, onStart }: SessionCardProps) {
-  const theme = chapterThemes[index % chapterThemes.length];
-  const IconComponent = chapterIcons[chapter.icon] || BookOpen;
+function SessionCard({
+  chapter,
+  index,
+  isActive,
+  completedLessons,
+  onStart,
+  trackX,
+  stride,
+  cardRef,
+}: SessionCardProps) {
+  const theme = THEMES[index % THEMES.length];
+  const Icon = CHAPTER_ICONS[chapter.icon] || BookOpen;
 
-  const chapterDone = chapter.lessons.filter(
+  const doneCount = chapter.lessons.filter(
     (l) => completedLessons.has(`${chapter.id}-${l.id}`)
   ).length;
   const firstIncomplete = chapter.lessons.find(
     (l) => !completedLessons.has(`${chapter.id}-${l.id}`)
   );
-  const allDone = chapterDone === chapter.lessons.length;
+  const allDone = doneCount === chapter.lessons.length;
+  const targetLesson = firstIncomplete ?? chapter.lessons[0];
 
-  const targetLesson = firstIncomplete || chapter.lessons[0];
+  // Per-card motion transforms — hooks always called (no conditionals)
+  const scale = useTransform(trackX, (x) => {
+    const d = Math.abs((x + index * stride) / (stride || 360));
+    return Math.max(0.83, 1 - d * 0.14);
+  });
+  const opacity = useTransform(trackX, (x) => {
+    const d = Math.abs((x + index * stride) / (stride || 360));
+    return Math.max(0.42, 1 - d * 0.44);
+  });
+
+  const ctaLabel = allDone ? 'Review' : doneCount > 0 ? 'Continue' : 'Start';
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.07, duration: 0.35 }}
-      className={`snap-center flex-shrink-0 w-[min(340px,82vw)] rounded-3xl overflow-hidden bg-gradient-to-b ${theme.bg} select-none`}
-      style={{
-        border: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
-      }}
+      ref={cardRef}
+      style={{ scale, opacity }}
+      className="flex-shrink-0 w-[min(340px,82vw)] rounded-3xl overflow-hidden will-change-transform"
+      aria-roledescription="slide"
+      aria-label={`Chapter ${index + 1}: ${chapter.title}`}
     >
-      {/* Card header */}
-      <div className="pt-7 pb-4 px-6 text-center">
-        <h3 className="text-xl font-bold text-white leading-tight">{chapter.title}</h3>
-        <span className="text-xs font-bold tracking-widest mt-1 block" style={{ color: theme.accent }}>
-          {theme.level}
-        </span>
-      </div>
-
-      {/* Illustration area */}
-      <div className="mx-6 rounded-2xl overflow-hidden flex items-center justify-center py-8" style={{ background: theme.accentLight }}>
-        <div
-          className="w-20 h-20 rounded-2xl flex items-center justify-center"
-          style={{ background: theme.accent + '30', border: `2px solid ${theme.accent}40` }}
-        >
-          <IconComponent className="w-10 h-10" style={{ color: theme.accent }} />
-        </div>
-      </div>
-
-      {/* Lessons list */}
-      <div className="px-6 pt-4 pb-2 divide-y divide-white/5">
-        {chapter.lessons.map((lesson, li) => {
-          const isAccessible =
-            li === 0 ||
-            completedLessons.has(`${chapter.id}-${chapter.lessons[li - 1].id}`);
-          const isFirst = lesson === firstIncomplete && isAccessible;
-
-          return (
-            <LessonRow
-              key={lesson.id}
-              lesson={lesson}
-              chapterId={chapter.id}
-              completedLessons={completedLessons}
-              isFirst={isFirst}
-            />
-          );
-        })}
-      </div>
-
-      {/* Start button */}
-      <div className="px-6 pt-4 pb-7">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => onStart(chapter.id, targetLesson.id)}
-          className="w-full py-4 rounded-2xl font-bold text-white text-base relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent}cc)`,
-            boxShadow: `0 4px 20px ${theme.accent}55`,
-          }}
-        >
-          {/* Shine overlay */}
+      <div
+        className="rounded-3xl overflow-hidden h-full"
+        style={{
+          background: 'linear-gradient(160deg, #1e2232 0%, #12141e 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          boxShadow: isActive
+            ? `0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(${theme.accentRgb}, 0.12)`
+            : '0 12px 32px rgba(0,0,0,0.35)',
+        }}
+      >
+        {/* Header */}
+        <div className="pt-7 pb-4 px-6 text-center">
+          <h3 className="text-[17px] font-bold text-white leading-tight tracking-tight">
+            {chapter.title}
+          </h3>
           <span
-            className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{ background: 'linear-gradient(120deg, rgba(255,255,255,0.15) 0%, transparent 60%)' }}
-          />
-          <span className="relative flex items-center justify-center gap-2">
-            <Play className="w-4 h-4 fill-white" />
-            {allDone ? 'Review' : chapterDone > 0 ? 'Continue' : 'Start'}
+            className="text-[10px] font-bold tracking-[0.22em] mt-1.5 block uppercase"
+            style={{ color: theme.accent }}
+          >
+            {theme.level}
           </span>
-        </motion.button>
+        </div>
+
+        {/* Illustration */}
+        <CardIllustration Icon={Icon} accent={theme.accent} accentRgb={theme.accentRgb} />
+
+        {/* Lesson list */}
+        <div className="px-6 pt-3 pb-1 divide-y divide-white/[0.05]">
+          {chapter.lessons.map((lesson, li) => {
+            const prevDone =
+              li === 0 ||
+              completedLessons.has(`${chapter.id}-${chapter.lessons[li - 1].id}`);
+            return (
+              <LessonRow
+                key={lesson.id}
+                lesson={lesson}
+                chapterId={chapter.id}
+                completedLessons={completedLessons}
+                isNext={lesson === firstIncomplete && prevDone}
+                accent={theme.accent}
+              />
+            );
+          })}
+        </div>
+
+        {/* CTA */}
+        <div className="px-6 pt-4 pb-7">
+          <motion.button
+            whileHover={{ scale: 1.025 }}
+            whileTap={{ scale: 0.965 }}
+            onClick={() => onStart(chapter.id, targetLesson.id)}
+            className="w-full py-[14px] rounded-2xl font-bold text-white text-sm relative overflow-hidden"
+            style={{
+              background: `linear-gradient(130deg, ${theme.accent}, ${theme.accent}bb)`,
+              boxShadow: `0 ${isActive ? 8 : 4}px ${isActive ? 28 : 14}px rgba(${theme.accentRgb}, ${isActive ? 0.42 : 0.22})`,
+            }}
+            aria-label={`${ctaLabel} ${chapter.title}`}
+          >
+            <span
+              className="absolute inset-0 rounded-2xl pointer-events-none"
+              style={{ background: 'linear-gradient(115deg, rgba(255,255,255,0.16) 0%, transparent 52%)' }}
+            />
+            <span className="relative flex items-center justify-center gap-2">
+              <Play className="w-3.5 h-3.5 fill-white" />
+              {ctaLabel}
+            </span>
+          </motion.button>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-interface HorizontalCourseListProps {
+// ─── HorizontalCourseList (root carousel) ────────────────────────────────────
+
+export interface HorizontalCourseListProps {
   chapters: Chapter[];
   completedLessons: Set<string>;
   onStart: (chapterId: number, lessonId: number) => void;
@@ -189,65 +378,91 @@ export function HorizontalCourseList({
   onStart,
   title = 'Course Chapters',
 }: HorizontalCourseListProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { activeIndex, stride, trackX, goTo, goNext, goPrev, handleDragEnd, cardRef } =
+    useCarousel(chapters.length);
 
-  const scroll = (dir: 'left' | 'right') => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir === 'right' ? 360 : -360, behavior: 'smooth' });
-  };
+  const dragLeft  = -(chapters.length - 1) * stride;
+  const dragRight = 0;
 
   return (
-    <div className="py-8">
-      {/* Header row */}
-      <div className="max-w-7xl mx-auto px-6 mb-5 flex items-center justify-between">
+    <section className="py-8" aria-label={title} aria-roledescription="carousel">
+      {/* Header */}
+      <div className="max-w-7xl mx-auto px-6 mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold text-navy-900">{title}</h2>
         <div className="flex gap-2">
-          <button
-            onClick={() => scroll('left')}
-            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 transition-colors flex items-center justify-center"
-            aria-label="Scroll left"
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={goPrev}
+            disabled={activeIndex === 0}
+            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 disabled:opacity-30 transition-colors flex items-center justify-center"
+            aria-label="Previous chapter"
           >
             <ChevronLeft className="w-5 h-5 text-navy-600" />
-          </button>
-          <button
-            onClick={() => scroll('right')}
-            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 transition-colors flex items-center justify-center"
-            aria-label="Scroll right"
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={goNext}
+            disabled={activeIndex === chapters.length - 1}
+            className="w-9 h-9 rounded-full bg-navy-100 hover:bg-navy-200 disabled:opacity-30 transition-colors flex items-center justify-center"
+            aria-label="Next chapter"
           >
             <ChevronRight className="w-5 h-5 text-navy-600" />
-          </button>
+          </motion.button>
         </div>
       </div>
 
-      {/* Scroll container */}
+      {/* Carousel viewport — overflow hidden clips side-cards */}
       <div
-        ref={scrollRef}
-        className="overflow-x-auto pb-4"
-        style={{
-          scrollSnapType: 'x mandatory',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          WebkitOverflowScrolling: 'touch',
-        }}
+        className="overflow-hidden px-6 cursor-grab active:cursor-grabbing"
+        role="list"
       >
-        <div className="flex gap-5 px-6 max-w-7xl mx-auto">
+        <motion.div
+          className="flex"
+          style={{ x: trackX, gap: CARD_GAP }}
+          drag="x"
+          dragConstraints={{ left: dragLeft, right: dragRight }}
+          dragElastic={0.10}
+          dragMomentum={false}
+          onDragEnd={(_, info) => handleDragEnd(info.velocity.x)}
+        >
           {chapters.map((chapter, index) => (
             <SessionCard
               key={chapter.id}
               chapter={chapter}
               index={index}
+              isActive={index === activeIndex}
               completedLessons={completedLessons}
               onStart={onStart}
+              trackX={trackX}
+              stride={stride}
+              cardRef={index === 0 ? cardRef : undefined}
             />
           ))}
-          {/* Trailing space so last card snaps cleanly */}
-          <div className="flex-shrink-0 w-4" />
-        </div>
+        </motion.div>
       </div>
-    </div>
+
+      {/* Pagination dots */}
+      <div
+        className="flex items-center justify-center gap-2 mt-6"
+        role="tablist"
+        aria-label="Chapter pagination"
+      >
+        {chapters.map((_, i) => (
+          <PaginationDot
+            key={i}
+            index={i}
+            isActive={i === activeIndex}
+            trackX={trackX}
+            stride={stride}
+            onClick={() => goTo(i)}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
-// Keep named export for legacy imports
-export { SessionCard as CourseCard };
+// Legacy named export
+export { HorizontalCourseList as CourseCard };
