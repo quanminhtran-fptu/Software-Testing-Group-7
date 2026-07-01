@@ -87,7 +87,7 @@ export function HomeScreen({
   userStreak,
   completedLessons,
   onStartLesson,
-  }: HomeScreenProps) {
+}: HomeScreenProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const activeTask = homeTasks[activeIndex];
@@ -98,7 +98,7 @@ export function HomeScreen({
     0
   );
 
-   const progressPercent = Math.min(
+  const progressPercent = Math.min(
     100,
     Math.round((completedLessons.size / Math.max(1, totalLessons)) * 100)
   );
@@ -136,7 +136,7 @@ export function HomeScreen({
               <Zap className="w-5 h-5 text-sky-400" />
               learning streak
             </div>
-            
+
             <p className="text-sky-900 font-semibold leading-7 mb-5">
               Complete 3 quick problems
               <br />
@@ -155,11 +155,11 @@ export function HomeScreen({
                       : 'bg-sky-100 text-sky-300'
                   }`}
                 >
-                                    {index === 0 ? '✓' : '•'}
+                  {index === 0 ? '✓' : '•'}
                 </div>
               ))}
             </div>
-            
+
             <div className="flex items-center gap-6 pl-1 text-xs font-bold text-sky-700">
               <span>M</span>
               <span>T</span>
@@ -183,7 +183,7 @@ export function HomeScreen({
             </div>
           </div>
         </div>
-        
+
         {/* Right column */}
         <div>
           <h2 className="text-2xl font-extrabold text-sky-900 mb-4">
