@@ -12,18 +12,12 @@ import {
 } from 'lucide-react';
 import { Chapter } from '../types/course';
 
-interface LessonState {
-  chapterId: number;
-  lessonId: number;
-}
-
 interface HomeScreenProps {
   chapters: Chapter[];
   userXp: number;
   userStreak: number;
   completedLessons: Set<string>;
-  onStartLesson: (chapterId: number, lessonId: number) => void;
-  continueLesson: LessonState | null;
+  onOpenChapter: (chapterId: number) => void;
 }
 
 const homeTasks = [
@@ -86,7 +80,7 @@ export function HomeScreen({
   userXp,
   userStreak,
   completedLessons,
-  onStartLesson,
+  onOpenChapter,
 }: HomeScreenProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -104,8 +98,8 @@ export function HomeScreen({
   );
 
   const startHeroLesson = () => {
-    if (activeChapter?.lessons?.[0]) {
-      onStartLesson(activeChapter.id, activeChapter.lessons[0].id);
+    if (activeChapter) {
+      onOpenChapter(activeChapter.id);
     }
   };
 
