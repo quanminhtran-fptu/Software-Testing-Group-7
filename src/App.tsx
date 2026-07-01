@@ -175,7 +175,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50 mesh-bg relative z-0 overflow-hidden font-sans text-navy-900 transition-colors duration-500">
+      {/* Ambient background particles */}
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary-400/10 rounded-full blur-[100px] pointer-events-none animate-pulse-ring" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-success-400/10 rounded-full blur-[100px] pointer-events-none animate-float" style={{ animationDelay: '2s' }} />
+
       <ProgressHeader
         xp={userXp}
         streak={userStreak}
