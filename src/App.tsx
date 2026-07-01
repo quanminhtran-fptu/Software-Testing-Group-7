@@ -15,8 +15,15 @@ interface LessonState {
   lessonId: number;
 }
 
+interface ViewState {
+  view: View;
+  currentLesson: LessonState | null;
+  currentChapterId: number | null;
+}
+
 export default function App() {
   const [view, setView] = useState<View>('home');
+  const [viewHistory, setViewHistory] = useState<ViewState[]>([]);
   const [currentLesson, setCurrentLesson] = useState<LessonState | null>(null);
   const [currentChapterId, setCurrentChapterId] = useState<number | null>(null);
   const [userXp, setUserXp] = useState(0);
@@ -63,24 +70,44 @@ export default function App() {
     localStorage.setItem('istqb_completed', JSON.stringify([...completed]));
   }, []);
 
+  const navigateTo = useCallback((newView: View, newLesson: LessonState | null = null, newChapterId: number | null = null) => {
+    setViewHistory(prev => [...prev, { view, currentLesson, currentChapterId }]);
+    setView(newView);
+    setCurrentLesson(newLesson);
+    setCurrentChapterId(newChapterId);
+  }, [view, currentLesson, currentChapterId]);
+
   const handleStartLesson = useCallback((chapterId: number, lessonId: number) => {
-    setCurrentLesson({ chapterId, lessonId });
-    setView('lesson');
-  }, []);
+    navigateTo('lesson', { chapterId, lessonId }, currentChapterId);
+  }, [navigateTo, currentChapterId]);
 
   const handleOpenChapter = useCallback((chapterId: number) => {
-    setCurrentChapterId(chapterId);
-    setView('chapterOverview');
-  }, []);
+    navigateTo('chapterOverview', currentLesson, chapterId);
+  }, [navigateTo, currentLesson]);
 
   const handleBackToHome = useCallback(() => {
-    setView('home');
-    setCurrentLesson(null);
-    setCurrentChapterId(null);
-  }, []);
+    navigateTo('home', null, null);
+  }, [navigateTo]);
 
   const handleOpenCourses = useCallback(() => {
-    setView('courses');
+    navigateTo('courses', currentLesson, currentChapterId);
+  }, [navigateTo, currentLesson, currentChapterId]);
+
+  const handleGoBack = useCallback(() => {
+    setViewHistory(prev => {
+      const newHistory = [...prev];
+      const prevState = newHistory.pop();
+      if (prevState) {
+        setView(prevState.view);
+        setCurrentLesson(prevState.currentLesson);
+        setCurrentChapterId(prevState.currentChapterId);
+      } else {
+        setView('home');
+        setCurrentLesson(null);
+        setCurrentChapterId(null);
+      }
+      return newHistory;
+    });
   }, []);
 
   const handleLessonComplete = useCallback(
@@ -153,15 +180,35 @@ export default function App() {
     return null;
   }, [currentLesson]);
 
+  const isLessonUnlocked = useCallback((chapterId: number, lessonId: number) => {
+    const chapterIdx = istqbCourse.findIndex((c) => c.id === chapterId);
+    if (chapterIdx === -1) return false;
+
+    const chapter = istqbCourse[chapterIdx];
+    const lessonIdx = chapter.lessons.findIndex((l) => l.id === lessonId);
+    if (lessonIdx === -1) return false;
+
+    if (chapterIdx === 0 && lessonIdx === 0) return true;
+
+    if (lessonIdx > 0) {
+      const prevLessonId = chapter.lessons[lessonIdx - 1].id;
+      return completedLessons.has(`${chapterId}-${prevLessonId}`);
+    }
+
+    const prevChapter = istqbCourse[chapterIdx - 1];
+    const prevLessonId = prevChapter.lessons[prevChapter.lessons.length - 1].id;
+    return completedLessons.has(`${prevChapter.id}-${prevLessonId}`);
+  }, [completedLessons]);
+
   const handleNext = useCallback(() => {
     const next = getNextLesson();
-    if (next) setCurrentLesson(next);
-  }, [getNextLesson]);
+    if (next) navigateTo('lesson', next, currentChapterId);
+  }, [getNextLesson, navigateTo, currentChapterId]);
 
   const handlePrevious = useCallback(() => {
     const prev = getPreviousLesson();
-    if (prev) setCurrentLesson(prev);
-  }, [getPreviousLesson]);
+    if (prev) navigateTo('lesson', prev, currentChapterId);
+  }, [getPreviousLesson, navigateTo, currentChapterId]);
 
   const currentChapterData = currentLesson
     ? istqbCourse.find((c) => c.id === currentLesson.chapterId)
@@ -183,6 +230,8 @@ export default function App() {
         onMenuClick={handleOpenCourses}
         onHomeClick={handleBackToHome}
         onCourseClick={handleOpenCourses}
+        canGoBack={viewHistory.length > 0}
+        onBackClick={handleGoBack}
       />
 
       <AnimatePresence mode="wait">
@@ -200,6 +249,7 @@ export default function App() {
               userStreak={userStreak}
               completedLessons={completedLessons}
               onOpenChapter={handleOpenChapter}
+              isLessonUnlocked={isLessonUnlocked}
             />
           </motion.div>
         )}
@@ -221,7 +271,8 @@ export default function App() {
                 chapterIndex={chapterIdx}
                 completedLessons={completedLessons}
                 onStartLesson={handleStartLesson}
-                onBack={handleBackToHome}
+                onBack={handleGoBack}
+                isLessonUnlocked={isLessonUnlocked}
               />
             </motion.div>
           );
@@ -239,6 +290,7 @@ export default function App() {
               chapters={istqbCourse}
               completedLessons={completedLessons}
               onSelectLesson={handleStartLesson}
+              isLessonUnlocked={isLessonUnlocked}
             />
           </motion.div>
         )}
@@ -254,7 +306,7 @@ export default function App() {
             <LessonView
               chapter={currentChapterData}
               lesson={currentLessonData}
-              onBack={handleBackToHome}
+              onBack={handleGoBack}
               onComplete={handleLessonComplete}
               onNext={handleNext}
               onPrevious={handlePrevious}

@@ -1,5 +1,6 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, HelpCircle, ChevronLeft, Zap, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, BookOpen, HelpCircle, ChevronLeft, Zap, CheckCircle2, Lock } from 'lucide-react';
 import { Chapter } from '../types/course';
 
 interface ChapterOverviewPageProps {
@@ -8,14 +9,16 @@ interface ChapterOverviewPageProps {
   onStartLesson: (chapterId: number, lessonId: number) => void;
   onBack: () => void;
   chapterIndex: number;
+  isLessonUnlocked: (chapterId: number, lessonId: number) => boolean;
 }
 
-export function ChapterOverviewPage({
+export const ChapterOverviewPage = memo(function ChapterOverviewPage({
   chapter,
   completedLessons,
   onStartLesson,
   onBack,
   chapterIndex,
+  isLessonUnlocked,
 }: ChapterOverviewPageProps) {
   const totalXp = chapter.lessons.reduce((sum, l) => sum + l.xpReward, 0);
   const doneCount = chapter.lessons.filter((l) =>
@@ -155,6 +158,7 @@ export function ChapterOverviewPage({
             const isCompleted = completedLessons.has(`${chapter.id}-${lesson.id}`);
             const isQuiz = lesson.type === 'quiz';
             const isFirst = idx === 0;
+            const isUnlocked = isLessonUnlocked(chapter.id, lesson.id);
 
             return (
               <motion.div
@@ -171,13 +175,14 @@ export function ChapterOverviewPage({
 
                 {/* Node */}
                 <button
-                  onClick={() => onStartLesson(chapter.id, lesson.id)}
-                  className="group relative flex flex-col items-center w-full"
+                  onClick={() => isUnlocked && onStartLesson(chapter.id, lesson.id)}
+                  disabled={!isUnlocked}
+                  className={`group relative flex flex-col items-center w-full ${!isUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   {/* Icon bubble */}
                   <div className="relative mb-2">
                     {/* Outer ring for active/first */}
-                    {isFirst && !isCompleted && (
+                    {isFirst && !isCompleted && isUnlocked && (
                       <motion.div
                         animate={{ scale: [1, 1.18, 1] }}
                         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
@@ -186,9 +191,11 @@ export function ChapterOverviewPage({
                     )}
 
                     <div
-                      className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-all group-hover:scale-110 ${
+                      className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-all ${isUnlocked ? 'group-hover:scale-110' : ''} ${!isCompleted && isUnlocked ? 'glow-pulse' : ''} ${
                         isCompleted
                           ? 'bg-green-500 text-white'
+                          : !isUnlocked
+                          ? 'bg-navy-100 text-navy-400'
                           : isFirst
                           ? 'bg-sky-500 text-white'
                           : isQuiz
@@ -198,6 +205,8 @@ export function ChapterOverviewPage({
                     >
                       {isCompleted ? (
                         <CheckCircle2 className="w-7 h-7" />
+                      ) : !isUnlocked ? (
+                        <Lock className="w-6 h-6" />
                       ) : isQuiz ? (
                         <HelpCircle className="w-7 h-7" />
                       ) : (
@@ -211,6 +220,8 @@ export function ChapterOverviewPage({
                     className={`text-sm font-bold text-center leading-snug ${
                       isCompleted
                         ? 'text-green-600'
+                        : !isUnlocked
+                        ? 'text-navy-400'
                         : isFirst
                         ? 'text-sky-700'
                         : 'text-sky-400'
@@ -232,4 +243,4 @@ export function ChapterOverviewPage({
       </div>
     </main>
   );
-}
+});

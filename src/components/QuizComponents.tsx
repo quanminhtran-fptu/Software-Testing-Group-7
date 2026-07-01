@@ -8,9 +8,10 @@ interface QuestionComponentProps {
   question: Question;
   onAnswer: (isCorrect: boolean) => void;
   showHint?: boolean;
+  onReviewTheory?: () => void;
 }
 
-export function MultipleChoice({ question, onAnswer, showHint }: QuestionComponentProps) {
+export function MultipleChoice({ question, onAnswer, showHint, onReviewTheory }: QuestionComponentProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [showHintState, setShowHintState] = useState(false);
@@ -120,12 +121,22 @@ export function MultipleChoice({ question, onAnswer, showHint }: QuestionCompone
           </motion.div>
 
           {!isCorrect && (
-            <button
-              onClick={handleRetry}
-              className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
-            >
-              Try Again
-            </button>
+            <div className="flex gap-3">
+              {onReviewTheory && (
+                <button
+                  onClick={onReviewTheory}
+                  className="flex-1 py-3 px-6 rounded-2xl font-semibold border-2 border-primary-200 text-primary-600 hover:bg-primary-50 transition-colors"
+                >
+                  Review Theory
+                </button>
+              )}
+              <button
+                onClick={handleRetry}
+                className="flex-1 py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -133,7 +144,7 @@ export function MultipleChoice({ question, onAnswer, showHint }: QuestionCompone
   );
 }
 
-export function DropdownQuestion({ question, onAnswer }: QuestionComponentProps) {
+export function DropdownQuestion({ question, onAnswer, onReviewTheory }: QuestionComponentProps) {
   const [selected, setSelected] = useState<string>('');
   const [showResult, setShowResult] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -240,12 +251,22 @@ export function DropdownQuestion({ question, onAnswer }: QuestionComponentProps)
           </motion.div>
 
           {!isCorrect && (
-            <button
-              onClick={handleRetry}
-              className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
-            >
-              Try Again
-            </button>
+            <div className="flex gap-3">
+              {onReviewTheory && (
+                <button
+                  onClick={onReviewTheory}
+                  className="flex-1 py-3 px-6 rounded-2xl font-semibold border-2 border-primary-200 text-primary-600 hover:bg-primary-50 transition-colors"
+                >
+                  Review Theory
+                </button>
+              )}
+              <button
+                onClick={handleRetry}
+                className="flex-1 py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -253,7 +274,7 @@ export function DropdownQuestion({ question, onAnswer }: QuestionComponentProps)
   );
 }
 
-export function TextInputQuestion({ question, onAnswer }: QuestionComponentProps) {
+export function TextInputQuestion({ question, onAnswer, onReviewTheory }: QuestionComponentProps) {
   const [input, setInput] = useState('');
   const [showResult, setShowResult] = useState(false);
   const [showHintState, setShowHintState] = useState(false);
@@ -351,12 +372,22 @@ export function TextInputQuestion({ question, onAnswer }: QuestionComponentProps
           </motion.div>
 
           {!isCorrect && (
-            <button
-              onClick={handleRetry}
-              className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
-            >
-              Try Again
-            </button>
+            <div className="flex gap-3">
+              {onReviewTheory && (
+                <button
+                  onClick={onReviewTheory}
+                  className="flex-1 py-3 px-6 rounded-2xl font-semibold border-2 border-primary-200 text-primary-600 hover:bg-primary-50 transition-colors"
+                >
+                  Review Theory
+                </button>
+              )}
+              <button
+                onClick={handleRetry}
+                className="flex-1 py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -364,7 +395,7 @@ export function TextInputQuestion({ question, onAnswer }: QuestionComponentProps
   );
 }
 
-export function MultiSelectQuestion({ question, onAnswer }: QuestionComponentProps) {
+export function MultiSelectQuestion({ question, onAnswer, onReviewTheory }: QuestionComponentProps) {
   const [selected, setSelected] = useState<string[]>([]);
   const [showResult, setShowResult] = useState(false);
   const [showHintState, setShowHintState] = useState(false);
@@ -470,28 +501,38 @@ export function MultiSelectQuestion({ question, onAnswer }: QuestionComponentPro
             </div>
           </motion.div>
 
-          <button
-            onClick={handleRetry}
-            className="w-full py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
-          >
-            Continue
-          </button>
+          <div className="flex gap-3">
+            {onReviewTheory && !isOptionCorrect(question.options![0]) && (
+              <button
+                onClick={onReviewTheory}
+                className="flex-1 py-3 px-6 rounded-2xl font-semibold border-2 border-primary-200 text-primary-600 hover:bg-primary-50 transition-colors"
+              >
+                Review Theory
+              </button>
+            )}
+            <button
+              onClick={handleRetry}
+              className="flex-1 py-3 px-6 rounded-2xl font-semibold bg-navy-100 text-navy-700 hover:bg-navy-200 transition-colors"
+            >
+              Continue
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export function QuestionCard({ question, onAnswer, showHint }: QuestionComponentProps) {
+export function QuestionCard({ question, onAnswer, showHint, onReviewTheory }: QuestionComponentProps) {
   switch (question.type) {
     case 'multiple-choice':
-      return <MultipleChoice question={question} onAnswer={onAnswer} showHint={showHint} />;
+      return <MultipleChoice question={question} onAnswer={onAnswer} showHint={showHint} onReviewTheory={onReviewTheory} />;
     case 'dropdown':
-      return <DropdownQuestion question={question} onAnswer={onAnswer} />;
+      return <DropdownQuestion question={question} onAnswer={onAnswer} onReviewTheory={onReviewTheory} />;
     case 'text-input':
-      return <TextInputQuestion question={question} onAnswer={onAnswer} showHint={showHint} />;
+      return <TextInputQuestion question={question} onAnswer={onAnswer} showHint={showHint} onReviewTheory={onReviewTheory} />;
     case 'multi-select':
-      return <MultiSelectQuestion question={question} onAnswer={onAnswer} showHint={showHint} />;
+      return <MultiSelectQuestion question={question} onAnswer={onAnswer} showHint={showHint} onReviewTheory={onReviewTheory} />;
     default:
       return null;
   }

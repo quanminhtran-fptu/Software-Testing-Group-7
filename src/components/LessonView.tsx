@@ -45,8 +45,12 @@ export function LessonView({
   const [mascotMessage, setMascotMessage] = useState<MascotMessage | null>(null);
   const [quizResultShown, setQuizResultShown] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showTheoryModal, setShowTheoryModal] = useState(false);
   const [xpRewards, setXpRewards] = useState<{ id: number; amount: number }[]>([]);
   const hasCompletedQuiz = useRef(false);
+
+  const previousTheoryLessons = chapter.lessons.filter(l => l.id < lesson.id && l.type === 'theory');
+  const lastTheoryLesson = previousTheoryLessons[previousTheoryLessons.length - 1];
 
   const { toasts, addToast, removeToast } = useToasts();
 
@@ -57,6 +61,7 @@ export function LessonView({
     setCorrectAnswers(0);
     setQuizResultShown(false);
     setShowCelebration(false);
+    setShowTheoryModal(false);
     setXpRewards([]);
     hasCompletedQuiz.current = false;
   }, [lesson.id]);
@@ -383,6 +388,7 @@ export function LessonView({
                   question={currentQuestion}
                   onAnswer={handleAnswer}
                   showHint={false}
+                  onReviewTheory={lastTheoryLesson ? () => setShowTheoryModal(true) : undefined}
                 />
               )}
             </motion.div>
@@ -414,6 +420,47 @@ export function LessonView({
         isVisible={showMascot}
         onClose={() => setShowMascot(false)}
       />
+
+      {/* Theory Review Modal */}
+      {showTheoryModal && lastTheoryLesson && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="fixed inset-0 z-50 bg-white overflow-y-auto"
+        >
+          <div className="max-w-4xl mx-auto px-4 py-8 pb-32">
+            <div className="flex justify-between items-center mb-8 sticky top-0 bg-white/90 backdrop-blur-md py-4 z-10 border-b border-navy-100">
+              <h2 className="text-2xl font-bold text-navy-900">Review: {lastTheoryLesson.title}</h2>
+              <button 
+                onClick={() => setShowTheoryModal(false)} 
+                className="p-3 bg-navy-100 rounded-full hover:bg-navy-200 transition-colors"
+              >
+                <X className="w-6 h-6 text-navy-600" />
+              </button>
+            </div>
+            
+            <div className="bg-white rounded-3xl shadow-medium border border-navy-100 p-6 md:p-8">
+              {lastTheoryLesson.content.sections && (
+                <TheorySection
+                  sections={lastTheoryLesson.content.sections}
+                  realWorldExample={lastTheoryLesson.content.realWorldExample}
+                  furtherReading={lastTheoryLesson.furtherReading}
+                />
+              )}
+            </div>
+
+            <div className="mt-8 flex justify-center">
+              <button 
+                onClick={() => setShowTheoryModal(false)} 
+                className="py-4 px-12 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl shadow-glow hover:scale-105 transition-transform"
+              >
+                Return to Quiz
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

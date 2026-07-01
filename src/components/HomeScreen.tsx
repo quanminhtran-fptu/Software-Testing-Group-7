@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap,
@@ -12,6 +12,7 @@ import {
   Award,
 } from 'lucide-react';
 import { Chapter } from '../types/course';
+import { Hero3DScene } from './Hero3DScene';
 
 interface HomeScreenProps {
   chapters: Chapter[];
@@ -19,6 +20,7 @@ interface HomeScreenProps {
   userStreak: number;
   completedLessons: Set<string>;
   onOpenChapter: (chapterId: number) => void;
+  isLessonUnlocked: (chapterId: number, lessonId: number) => boolean;
 }
 
 const homeTasks = [
@@ -80,7 +82,7 @@ const homeTasks = [
   },
 ];
 
-export function HomeScreen({
+export const HomeScreen = memo(function HomeScreen({
   chapters,
   userXp,
   userStreak,
@@ -92,15 +94,14 @@ export function HomeScreen({
   const activeTask = homeTasks[activeIndex];
   const activeChapter = chapters[activeIndex] || chapters[0];
 
-  const totalLessons = chapters.reduce(
-    (sum, chapter) => sum + chapter.lessons.length,
-    0
-  );
-
-  const progressPercent = Math.min(
-    100,
-    Math.round((completedLessons.size / Math.max(1, totalLessons)) * 100)
-  );
+  const { progressPercent } = useMemo(() => {
+    const total = chapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
+    const percent = Math.min(
+      100,
+      Math.round((completedLessons.size / Math.max(1, total)) * 100)
+    );
+    return { progressPercent: percent };
+  }, [chapters, completedLessons.size]);
 
   const startHeroLesson = () => {
     if (activeChapter) {
@@ -205,16 +206,23 @@ export function HomeScreen({
                 className={`relative grid grid-cols-1 lg:grid-cols-2 rounded-[40px] overflow-hidden bg-gradient-to-br ${activeTask.color} shadow-2xl border border-white/20`}
               >
                 {/* 3D Visual Area */}
-                <div className="relative min-h-[400px] lg:min-h-[500px] flex items-center justify-center overflow-hidden bg-black/10 backdrop-blur-sm">
+                <div className="relative min-h-[400px] lg:min-h-[500px] flex items-center justify-center overflow-hidden bg-black/10 backdrop-blur-sm group/3d">
                   {/* Decorative circles */}
-                  <div className="absolute -top-20 -left-20 w-64 h-64 border-[40px] border-white/10 rounded-full blur-sm" />
-                  <div className="absolute -bottom-32 -right-32 w-96 h-96 border-[60px] border-white/5 rounded-full blur-md" />
+                  <div className="absolute -top-20 -left-20 w-64 h-64 border-[40px] border-white/10 rounded-full blur-sm group-hover/3d:scale-110 transition-transform duration-700" />
+                  <div className="absolute -bottom-32 -right-32 w-96 h-96 border-[60px] border-white/5 rounded-full blur-md group-hover/3d:scale-105 transition-transform duration-700" />
                   
+                  <Hero3DScene color={
+                    activeIndex === 0 ? '#3b82f6' :
+                    activeIndex === 1 ? '#6366f1' :
+                    activeIndex === 2 ? '#8b5cf6' :
+                    '#14b8a6'
+                  } />
+
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="absolute top-12 left-10 bg-white/90 backdrop-blur-md text-navy-900 font-black rounded-2xl px-6 py-3 shadow-xl border border-white"
+                    className="absolute top-12 left-10 bg-white/80 backdrop-blur-md text-navy-900 font-black rounded-2xl px-6 py-3 shadow-xl border border-white/50"
                   >
                     🚀 Push
                   </motion.div>
@@ -223,7 +231,7 @@ export function HomeScreen({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="absolute top-32 right-12 bg-white/90 backdrop-blur-md text-navy-900 font-black rounded-2xl px-6 py-3 shadow-xl border border-white"
+                    className="absolute top-32 right-12 bg-white/80 backdrop-blur-md text-navy-900 font-black rounded-2xl px-6 py-3 shadow-xl border border-white/50"
                   >
                     🧪 Test
                   </motion.div>
@@ -232,20 +240,9 @@ export function HomeScreen({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
-                    className="absolute bottom-20 left-16 bg-white/90 backdrop-blur-md text-navy-900 font-black rounded-2xl px-6 py-3 shadow-xl border border-white"
+                    className="absolute bottom-20 left-16 bg-white/80 backdrop-blur-md text-navy-900 font-black rounded-2xl px-6 py-3 shadow-xl border border-white/50"
                   >
                     📦 Build
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.5, rotate: -15 }}
-                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                    transition={{ duration: 0.6, type: 'spring', bounce: 0.5 }}
-                    className="w-72 h-72 rounded-full bg-white/10 border-2 border-white/30 flex items-center justify-center backdrop-blur-md shadow-glow relative z-10"
-                  >
-                    <span className="text-white text-9xl font-black drop-shadow-2xl">
-                      {activeIndex + 1}
-                    </span>
                   </motion.div>
                 </div>
 
@@ -381,4 +378,4 @@ export function HomeScreen({
       </div>
     </main>
   );
-}
+});

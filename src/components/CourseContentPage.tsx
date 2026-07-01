@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Chapter } from '../types/course';
 import { BookOpen, CheckCircle2, Lock, PlayCircle } from 'lucide-react';
@@ -6,12 +7,14 @@ interface CourseContentPageProps {
   chapters: Chapter[];
   completedLessons: Set<string>;
   onSelectLesson: (chapterId: number, lessonId: number) => void;
+  isLessonUnlocked: (chapterId: number, lessonId: number) => boolean;
 }
 
-export function CourseContentPage({
+export const CourseContentPage = memo(function CourseContentPage({
   chapters,
   completedLessons,
   onSelectLesson,
+  isLessonUnlocked,
 }: CourseContentPageProps) {
   return (
     <main className="pt-24 px-6 pb-20 min-h-screen relative z-10">
@@ -71,24 +74,30 @@ export function CourseContentPage({
                   {chapter.lessons.map((lesson, lessonIndex) => {
                     const lessonKey = `${chapter.id}-${lesson.id}`;
                     const isCompleted = completedLessons.has(lessonKey);
+                    const isUnlocked = isLessonUnlocked(chapter.id, lesson.id);
 
                     return (
                       <button
                         key={lesson.id}
-                        onClick={() => onSelectLesson(chapter.id, lesson.id)}
-                        className={`w-full rounded-2xl border-2 btn-press px-6 py-5 text-left transition-all duration-300 flex items-center justify-between gap-4 group/btn ${
+                        onClick={() => isUnlocked && onSelectLesson(chapter.id, lesson.id)}
+                        disabled={!isUnlocked}
+                        className={`w-full rounded-2xl border-2 px-6 py-5 text-left transition-all duration-300 flex items-center justify-between gap-4 group/btn ${
                           isCompleted
-                            ? 'bg-success-50/50 border-success-100 hover:border-success-300 hover:bg-success-50 hover:shadow-md'
-                            : 'bg-white border-navy-100 hover:border-primary-300 hover:shadow-[0_8px_30px_rgba(45,127,249,0.12)]'
+                            ? 'bg-success-50/50 border-success-100 hover:border-success-300 hover:bg-success-50 hover:shadow-md btn-press'
+                            : !isUnlocked
+                            ? 'bg-navy-50/50 border-navy-100 opacity-60 cursor-not-allowed'
+                            : 'bg-white border-navy-100 hover:border-primary-300 hover:shadow-[0_8px_30px_rgba(45,127,249,0.12)] btn-press'
                         }`}
                       >
                         <div className="flex items-center gap-5">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black shadow-sm transition-transform group-hover/btn:scale-110 ${
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black shadow-sm transition-transform ${isUnlocked ? 'group-hover/btn:scale-110' : ''} ${!isCompleted && isUnlocked ? 'glow-pulse' : ''} ${
                             isCompleted 
                               ? 'bg-success-500 text-white shadow-glow-success' 
+                              : !isUnlocked
+                              ? 'bg-navy-100 text-navy-400 border border-navy-200'
                               : 'bg-navy-50 text-navy-400 border border-navy-100 group-hover/btn:bg-primary-50 group-hover/btn:text-primary-600 group-hover/btn:border-primary-200'
                           }`}>
-                            {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : lessonIndex + 1}
+                            {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : !isUnlocked ? <Lock className="w-5 h-5" /> : lessonIndex + 1}
                           </div>
 
                           <div>
@@ -107,11 +116,15 @@ export function CourseContentPage({
                           className={`flex items-center gap-2 text-sm font-black uppercase tracking-wider px-4 py-2 rounded-xl transition-colors ${
                             isCompleted 
                               ? 'text-success-600 bg-success-100/50' 
+                              : !isUnlocked
+                              ? 'text-navy-400 bg-navy-100'
                               : 'text-primary-500 bg-primary-50 opacity-0 group-hover/btn:opacity-100 -translate-x-4 group-hover/btn:translate-x-0 transition-all duration-300'
                           }`}
                         >
                           {isCompleted ? (
                             'Completed'
+                          ) : !isUnlocked ? (
+                            'Locked'
                           ) : (
                             <>
                               Start <PlayCircle className="w-4 h-4" />
@@ -129,4 +142,4 @@ export function CourseContentPage({
       </div>
     </main>
   );
-}
+});
