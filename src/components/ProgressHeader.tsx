@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Layers, Search, PenTool, ClipboardList, Wrench, ArrowLeft, Menu, X } from 'lucide-react';
+import { BookOpen, Layers, Search, PenTool, ClipboardList, Wrench, ArrowLeft, Menu, ChevronDown } from 'lucide-react';
 import { Chapter } from '../types/course';
 import { XpCounter, StreakBadge } from '../styles';
 
@@ -74,108 +74,108 @@ export function Sidebar({
   onClose
 }: SidebarProps) {
   return (
-    <>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-navy-900/20 backdrop-blur-sm z-40 lg:hidden"
-          />
-        )}
-      </AnimatePresence>
-
-      <aside
-        className={`fixed top-16 left-0 bottom-0 w-80 bg-white border-r border-navy-100 overflow-y-auto z-40 transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+    <aside className="w-80 flex-shrink-0 bg-white border-r border-navy-100 overflow-hidden flex flex-col">
+      {/* Header with toggle */}
+      <button
+        onClick={onClose}
+        className="w-full flex items-center justify-between p-4 hover:bg-navy-50 transition-colors group"
+        aria-expanded={isOpen}
+        aria-label="Toggle course content"
       >
-        <div className="flex items-center justify-between p-4 lg:hidden">
-          <h2 className="font-bold text-navy-900">Course Content</h2>
-          <button onClick={onClose} className="p-1 hover:bg-navy-100 rounded-lg">
-            <X className="w-5 h-5 text-navy-500" />
-          </button>
-        </div>
+        <h2 className="font-bold text-navy-900 flex items-center gap-2">
+          <BookOpen className="w-5 h-5 text-primary-500" />
+          Course Content
+        </h2>
+        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+          <ChevronDown className="w-5 h-5 text-navy-400 group-hover:text-navy-600" />
+        </motion.div>
+      </button>
 
-        <nav className="p-4">
-          <h2 className="font-bold text-navy-900 mb-4 px-2 hidden lg:block">Course Content</h2>
+      {/* Expandable content */}
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.nav
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="overflow-y-auto px-4 pb-4"
+          >
+            {chapters.map((chapter) => {
+              const IconComponent = chapterIcons[chapter.icon] || BookOpen;
+              const isActive = currentChapter === chapter.id;
 
-          {chapters.map((chapter) => {
-            const IconComponent = chapterIcons[chapter.icon] || BookOpen;
-            const isActive = currentChapter === chapter.id;
-
-            return (
-              <div key={chapter.id} className="mb-4">
-                <button
-                  onClick={() => onSelectLesson(chapter.id, chapter.lessons[0].id)}
-                  className={`w-full text-left p-3 rounded-xl transition-all ${
-                    isActive ? 'bg-primary-50 border border-primary-200' : 'hover:bg-navy-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                        isActive
-                          ? 'bg-gradient-to-br from-primary-500 to-primary-600'
-                          : 'bg-navy-100'
-                      }`}
-                    >
-                      <IconComponent className={`w-5 h-5 ${isActive ? 'text-white' : 'text-navy-600'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-navy-900 text-sm truncate">
-                        {chapter.title}
-                      </h3>
-                      <p className="text-xs text-navy-500">
-                        {chapter.lessons.length} lessons
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                <div className={`ml-4 pl-4 border-l-2 ${isActive ? 'border-primary-200' : 'border-navy-100'}`}>
-                  {chapter.lessons.map((lesson) => {
-                    const lessonKey = `${chapter.id}-${lesson.id}`;
-                    const isCompleted = completedLessons.has(lessonKey);
-                    const isCurrentLesson = currentChapter === chapter.id && currentLesson === lesson.id;
-
-                    return (
-                      <button
-                        key={lesson.id}
-                        onClick={() => onSelectLesson(chapter.id, lesson.id)}
-                        className={`w-full text-left py-2 px-3 rounded-lg text-sm transition-all ${
-                          isCurrentLesson
-                            ? 'bg-primary-100 text-primary-700 font-medium'
-                            : 'text-navy-600 hover:bg-navy-50'
+              return (
+                <div key={chapter.id} className="mb-4">
+                  <button
+                    onClick={() => onSelectLesson(chapter.id, chapter.lessons[0].id)}
+                    className={`w-full text-left p-3 rounded-xl transition-all ${
+                      isActive ? 'bg-primary-50 border border-primary-200' : 'hover:bg-navy-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                          isActive
+                            ? 'bg-gradient-to-br from-primary-500 to-primary-600'
+                            : 'bg-navy-100'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          {isCompleted ? (
-                            <div className="w-5 h-5 bg-success-500 rounded-full flex items-center justify-center flex-shrink-0">
-                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>
-                          ) : (
-                            <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 ${
-                              lesson.type === 'quiz' ? 'border-accent-400' : 'border-navy-300'
-                            }`} />
-                          )}
-                          <span className="truncate flex-1">{lesson.title}</span>
-                          <span className="ml-auto text-xs text-navy-400 flex-shrink-0">{lesson.xpReward} XP</span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        <IconComponent className={`w-5 h-5 ${isActive ? 'text-white' : 'text-navy-600'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-navy-900 text-sm truncate">
+                          {chapter.title}
+                        </h3>
+                        <p className="text-xs text-navy-500">
+                          {chapter.lessons.length} lessons
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <div className={`ml-4 pl-4 border-l-2 ${isActive ? 'border-primary-200' : 'border-navy-100'}`}>
+                    {chapter.lessons.map((lesson) => {
+                      const lessonKey = `${chapter.id}-${lesson.id}`;
+                      const isCompleted = completedLessons.has(lessonKey);
+                      const isCurrentLesson = currentChapter === chapter.id && currentLesson === lesson.id;
+
+                      return (
+                        <button
+                          key={lesson.id}
+                          onClick={() => onSelectLesson(chapter.id, lesson.id)}
+                          className={`w-full text-left py-2 px-3 rounded-lg text-sm transition-all ${
+                            isCurrentLesson
+                              ? 'bg-primary-100 text-primary-700 font-medium'
+                              : 'text-navy-600 hover:bg-navy-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isCompleted ? (
+                              <div className="w-5 h-5 bg-success-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            ) : (
+                              <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 ${
+                                lesson.type === 'quiz' ? 'border-accent-400' : 'border-navy-300'
+                              }`} />
+                            )}
+                            <span className="truncate flex-1">{lesson.title}</span>
+                            <span className="ml-auto text-xs text-navy-400 flex-shrink-0">{lesson.xpReward} XP</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </nav>
-      </aside>
-    </>
+              );
+            })}
+          </motion.nav>
+        )}
+      </AnimatePresence>
+    </aside>
   );
 }
 

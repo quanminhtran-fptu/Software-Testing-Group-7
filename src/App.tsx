@@ -175,28 +175,29 @@ export default function App() {
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />
 
-      <Sidebar
-        chapters={istqbCourse}
-        currentChapter={currentLesson?.chapterId || null}
-        currentLesson={currentLesson?.lessonId || null}
-        onSelectLesson={handleStartLesson}
-        completedLessons={completedLessons}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+      <div className="flex">
+        <Sidebar
+          chapters={istqbCourse}
+          currentChapter={currentLesson?.chapterId || null}
+          currentLesson={currentLesson?.lessonId || null}
+          onSelectLesson={handleStartLesson}
+          completedLessons={completedLessons}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(!sidebarOpen)}
+        />
 
-      <div className="lg:pl-80">
-        <AnimatePresence mode="wait">
-          {view === 'home' && (
-            <motion.div
-              key="home"
-              variants={pageTransition}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <HomeScreen
-                chapters={istqbCourse}
+        <div className="flex-1 min-w-0">
+          <AnimatePresence mode="wait">
+            {view === 'home' && (
+              <motion.div
+                key="home"
+                variants={pageTransition}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <HomeScreen
+                  chapters={istqbCourse}
                 userXp={userXp}
                 userStreak={userStreak}
                 completedLessons={completedLessons}
@@ -257,6 +258,7 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
     </div>
   );
