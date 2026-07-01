@@ -20,7 +20,6 @@ import {
 import {
   BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
   CheckCircle2, Lock, Play, FileText, HelpCircle,
-  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Chapter, Lesson } from '../types/course';
 
@@ -33,8 +32,6 @@ const CARD_W   = 'min(340px, 82vw)' as const;
 // Spring config from spec
 const SPRING = { type: 'spring' as const, stiffness: 280, damping: 28, mass: 0.8 };
 
-const DRAG_SENSITIVITY  = 0.65;  // lower = easier to flick
-const FLICK_VELOCITY_PX = 300;   // px/s threshold for velocity-based snap
 
 // ─── Theme palette ────────────────────────────────────────────────────────────
 
@@ -64,17 +61,6 @@ function useCarousel(count: number) {
   const cardRef    = useRef<HTMLDivElement>(null); // ref on card 0 for measurement
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Drag state
-  const isDragging  = useRef(false);
-  const dragStartX  = useRef(0);
-  const dragStartP  = useRef(0);
-  const lastX       = useRef(0);
-  const lastTime    = useRef(0);
-  const velocityX   = useRef(0); // px/s, leftward = positive (→ next card)
-
-  // Wheel lockout (one card per gesture group)
-  const wheelLocked = useRef(false);
-
   activeRef.current = activeIndex;
 
   // Measure card width after mount and on resize
@@ -103,86 +89,9 @@ function useCarousel(count: number) {
     [count, progress],
   );
 
-  const goNext = useCallback(() => goTo(activeRef.current + 1), [goTo]);
-  const goPrev = useCallback(() => goTo(activeRef.current - 1), [goTo]);
-
-  // Keyboard
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
-      if (e.key === 'ArrowLeft')  { e.preventDefault(); goPrev(); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [goNext, goPrev]);
-
-  // Wheel / trackpad — snap exactly one card per gesture group
-  const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      e.preventDefault();
-      if (wheelLocked.current) return;
-      // Prefer horizontal delta (trackpad), fall back to vertical (mouse wheel)
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      const dir = delta > 0 ? 1 : -1;
-      goTo(activeRef.current + dir);
-      wheelLocked.current = true;
-      setTimeout(() => { wheelLocked.current = false; }, 680);
-    },
-    [goTo],
-  );
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
-
-  // Pointer drag (mouse + touch via pointer capture)
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    dragStartP.current = progress.get();
-    lastX.current      = e.clientX;
-    lastTime.current   = Date.now();
-    velocityX.current  = 0;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, [progress]);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging.current) return;
-    const now = Date.now();
-    const dt  = Math.max(1, now - lastTime.current);
-    // leftward movement = positive velocity = next card
-    velocityX.current = ((lastX.current - e.clientX) / dt) * 1000;
-    lastX.current    = e.clientX;
-    lastTime.current = now;
-
-    const delta = (dragStartX.current - e.clientX) * DRAG_SENSITIVITY;
-    const raw   = dragStartP.current + delta / strideRef.current;
-    const lo = 0, hi = count - 1;
-    const elastic = raw < lo
-      ? lo + (raw - lo) * 0.14
-      : raw > hi
-      ? hi + (raw - hi) * 0.14
-      : raw;
-    progress.set(elastic);
-  }, [count, progress]);
-
-  const onPointerUp = useCallback((_e?: React.PointerEvent) => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    const current = progress.get();
-    let target = Math.round(current);
-    if (velocityX.current >  FLICK_VELOCITY_PX) target = Math.ceil(current);
-    if (velocityX.current < -FLICK_VELOCITY_PX) target = Math.floor(current);
-    goTo(target);
-  }, [progress, goTo]);
-
   return {
-    activeIndex, progress, goTo, goNext, goPrev,
+    activeIndex, progress, goTo,
     strideRef, cardWRef, cardRef, containerRef,
-    onPointerDown, onPointerMove, onPointerUp,
   };
 }
 
@@ -531,9 +440,8 @@ export function HorizontalCourseList({
   title = 'Course Chapters',
 }: HorizontalCourseListProps) {
   const {
-    activeIndex, progress, goTo, goNext, goPrev,
+    activeIndex, progress, goTo,
     strideRef, cardWRef, cardRef, containerRef,
-    onPointerDown, onPointerMove, onPointerUp,
   } = useCarousel(chapters.length);
 
   const activeTheme = THEMES[activeIndex % THEMES.length];
@@ -571,14 +479,9 @@ export function HorizontalCourseList({
         {/* Card container (clips peek cards) */}
         <div
           ref={containerRef}
-          className="relative cursor-grab active:cursor-grabbing touch-none"
+          className="relative"
           style={{ height: CARD_H, overflow: 'hidden' }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerUp}
           role="list"
-          tabIndex={0}
           aria-label={`${chapters.length} chapters`}
         >
           {chapters.map((chapter, index) => (
@@ -595,34 +498,6 @@ export function HorizontalCourseList({
               elRef={index === 0 ? cardRef : undefined}
             />
           ))}
-        </div>
-
-        {/* Left / right nav buttons — centered vertically over the card area */}
-        <div className="absolute inset-y-0 left-0 flex items-center pl-2 z-20 pointer-events-none">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={goPrev}
-            disabled={activeIndex === 0}
-            className="pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-20 transition-opacity"
-            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
-            aria-label="Previous chapter"
-          >
-            <ChevronLeft className="w-5 h-5 text-white" />
-          </motion.button>
-        </div>
-        <div className="absolute inset-y-0 right-0 flex items-center pr-2 z-20 pointer-events-none">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={goNext}
-            disabled={activeIndex === chapters.length - 1}
-            className="pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-20 transition-opacity"
-            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
-            aria-label="Next chapter"
-          >
-            <ChevronRight className="w-5 h-5 text-white" />
-          </motion.button>
         </div>
       </div>
 
