@@ -423,35 +423,95 @@ function CarouselBackground({ activeIndex }: { activeIndex: number }) {
   );
 }
 
-// ─── PaginationDot ────────────────────────────────────────────────────────────
+// ─── ChapterTab ───────────────────────────────────────────────────────────────
 
-function PaginationDot({
+function ChapterTab({
+  chapter,
   index,
   isActive,
-  progress,
+  completedLessons,
   onClick,
 }: {
+  chapter: Chapter;
   index: number;
   isActive: boolean;
-  progress: MotionValue<number>;
+  completedLessons: Set<string>;
   onClick: () => void;
 }) {
-  const dotOpacity = useTransform(progress, (p) => Math.max(0.25, 1 - Math.abs(p - index) * 0.75));
+  const theme = THEMES[index % THEMES.length];
+  const Icon  = CHAPTER_ICONS[chapter.icon] || BookOpen;
+  const doneCount  = chapter.lessons.filter(l => completedLessons.has(`${chapter.id}-${l.id}`)).length;
+  const allDone    = doneCount === chapter.lessons.length;
+  const hasStarted = doneCount > 0;
+
+  // Short label: first word of title or "Start"
+  const label = index === 0
+    ? 'Start'
+    : chapter.title.split(' ').slice(0, 2).join(' ');
+
   return (
-    <motion.button
+    <button
       onClick={onClick}
-      animate={{ width: isActive ? 24 : 8 }}
-      transition={SPRING}
-      aria-label={`Go to chapter ${index + 1}`}
+      aria-label={`Go to chapter: ${chapter.title}`}
       aria-current={isActive ? 'true' : undefined}
-      className="rounded-full"
-      style={{
-        height: 8,
-        background: isActive ? '#ffffff' : 'rgba(255,255,255,0.32)',
-        opacity: dotOpacity,
-        flexShrink: 0,
-      } as React.CSSProperties}
-    />
+      className="flex flex-col items-center gap-1 flex-shrink-0 relative"
+      style={{ minWidth: 72 }}
+    >
+      {/* Icon bubble */}
+      <div
+        className="relative w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200"
+        style={{
+          background: isActive
+            ? theme.accent
+            : hasStarted
+            ? `rgba(${theme.rgb}, 0.18)`
+            : 'rgba(255,255,255,0.07)',
+          border: isActive
+            ? `2.5px solid ${theme.accent}`
+            : `2.5px solid ${hasStarted ? `rgba(${theme.rgb}, 0.35)` : 'rgba(255,255,255,0.1)'}`,
+          boxShadow: isActive
+            ? `0 4px 16px rgba(${theme.rgb}, 0.45)`
+            : 'none',
+        }}
+      >
+        {/* Number badge (non-active) or icon */}
+        {isActive ? (
+          <Icon className="w-6 h-6 text-white" />
+        ) : (
+          <span
+            className="text-lg font-extrabold leading-none"
+            style={{ color: hasStarted ? theme.accent : 'rgba(255,255,255,0.35)' }}
+          >
+            {index}
+          </span>
+        )}
+
+        {/* Completion ring */}
+        {allDone && !isActive && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+            <CheckCircle2 className="w-3 h-3 text-white" />
+          </span>
+        )}
+      </div>
+
+      {/* Label */}
+      <span
+        className="text-[10px] font-semibold leading-tight text-center max-w-[72px] line-clamp-1 transition-colors duration-200"
+        style={{ color: isActive ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.38)' }}
+      >
+        {label}
+      </span>
+
+      {/* Active underline */}
+      {isActive && (
+        <motion.div
+          layoutId="tab-underline"
+          className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full"
+          style={{ width: 24, height: 3, background: theme.accent }}
+          transition={SPRING}
+        />
+      )}
+    </button>
   );
 }
 
@@ -566,18 +626,19 @@ export function HorizontalCourseList({
         </div>
       </div>
 
-      {/* Horizontal pagination dots */}
+      {/* Chapter tab bar — Duolingo-style icon navigation */}
       <div
-        className="relative z-20 flex items-center justify-center gap-2 pt-5 pb-8"
+        className="relative z-20 flex items-start justify-center gap-2 sm:gap-3 pt-6 pb-9 px-4 overflow-x-auto no-scrollbar"
         role="tablist"
-        aria-label="Chapter pagination"
+        aria-label="Chapter navigation"
       >
-        {chapters.map((_, i) => (
-          <PaginationDot
-            key={i}
+        {chapters.map((chapter, i) => (
+          <ChapterTab
+            key={chapter.id}
+            chapter={chapter}
             index={i}
             isActive={i === activeIndex}
-            progress={progress}
+            completedLessons={completedLessons}
             onClick={() => goTo(i)}
           />
         ))}
