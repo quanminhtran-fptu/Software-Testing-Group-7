@@ -4,10 +4,11 @@ import { ProgressHeader } from './components/ProgressHeader';
 import { HomeScreen } from './components/HomeScreen';
 import { LessonView } from './components/LessonView';
 import { CourseContentPage } from './components/CourseContentPage';
+import { ChapterOverviewPage } from './components/ChapterOverviewPage';
 import { istqbCourse } from './data/istqb-course';
 import { pageTransition } from './styles';
 
-type View = 'home' | 'lesson' | 'courses';
+type View = 'home' | 'lesson' | 'courses' | 'chapterOverview';
 
 interface LessonState {
   chapterId: number;
@@ -17,6 +18,7 @@ interface LessonState {
 export default function App() {
   const [view, setView] = useState<View>('home');
   const [currentLesson, setCurrentLesson] = useState<LessonState | null>(null);
+  const [currentChapterId, setCurrentChapterId] = useState<number | null>(null);
   const [userXp, setUserXp] = useState(0);
   const [userStreak, setUserStreak] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
@@ -66,9 +68,15 @@ export default function App() {
     setView('lesson');
   }, []);
 
+  const handleOpenChapter = useCallback((chapterId: number) => {
+    setCurrentChapterId(chapterId);
+    setView('chapterOverview');
+  }, []);
+
   const handleBackToHome = useCallback(() => {
     setView('home');
     setCurrentLesson(null);
+    setCurrentChapterId(null);
   }, []);
 
   const handleOpenCourses = useCallback(() => {
@@ -163,17 +171,6 @@ export default function App() {
     ? currentChapterData.lessons.find((l) => l.id === currentLesson?.lessonId)
     : null;
 
-  const findFirstIncompleteLesson = (): LessonState | null => {
-    for (const chapter of istqbCourse) {
-      for (const lesson of chapter.lessons) {
-        if (!completedLessons.has(`${chapter.id}-${lesson.id}`)) {
-          return { chapterId: chapter.id, lessonId: lesson.id };
-        }
-      }
-    }
-    return { chapterId: 1, lessonId: 1 };
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 mesh-bg relative z-0 overflow-hidden font-sans text-navy-900 transition-colors duration-500">
       {/* Ambient background particles */}
@@ -202,11 +199,33 @@ export default function App() {
               userXp={userXp}
               userStreak={userStreak}
               completedLessons={completedLessons}
-              onStartLesson={handleStartLesson}
-              continueLesson={findFirstIncompleteLesson()}
+              onOpenChapter={handleOpenChapter}
             />
           </motion.div>
         )}
+
+        {view === 'chapterOverview' && currentChapterId !== null && (() => {
+          const chapter = istqbCourse.find((c) => c.id === currentChapterId);
+          const chapterIdx = istqbCourse.findIndex((c) => c.id === currentChapterId);
+          if (!chapter) return null;
+          return (
+            <motion.div
+              key={`chapter-${currentChapterId}`}
+              variants={pageTransition}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <ChapterOverviewPage
+                chapter={chapter}
+                chapterIndex={chapterIdx}
+                completedLessons={completedLessons}
+                onStartLesson={handleStartLesson}
+                onBack={handleBackToHome}
+              />
+            </motion.div>
+          );
+        })()}
 
         {view === 'courses' && (
           <motion.div
