@@ -189,19 +189,19 @@ export function HomeScreen({
         viewport={{ once: true }}
         className="max-w-7xl mx-auto px-6 py-12"
       >
-        <div className="bg-gradient-to-br from-navy-900 to-navy-800 rounded-3xl p-8 md:p-12 relative overflow-hidden">
-          <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary-500/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-success-500/20 rounded-full blur-3xl" />
+        <div className="bg-white rounded-3xl p-8 md:p-12 relative overflow-hidden border border-navy-100 shadow-large">
+          <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary-100/50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-success-100/40 rounded-full blur-3xl" />
 
           <div className="relative">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-5 h-5 text-primary-400" />
-              <span className="text-primary-400 font-medium text-sm">Your Journey</span>
+              <TrendingUp className="w-5 h-5 text-primary-500" />
+              <span className="text-primary-600 font-medium text-sm">Your Journey</span>
             </div>
-            <h2 className="text-3xl font-bold text-white mb-3 max-w-xl">
+            <h2 className="text-3xl font-bold text-navy-900 mb-3 max-w-xl">
               Keep your streak alive and earn achievements
             </h2>
-            <p className="text-white/70 mb-8 max-w-lg">
+            <p className="text-navy-500 mb-8 max-w-lg">
               Complete lessons daily to build your streak, earn XP, and unlock achievements as you master software testing.
             </p>
 
@@ -218,16 +218,20 @@ export function HomeScreen({
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className={`flex items-center gap-3 p-4 rounded-2xl ${
-                    item.unlocked ? 'bg-white/10 backdrop-blur-sm' : 'bg-white/5'
+                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${
+                    item.unlocked
+                      ? 'bg-primary-50 border-primary-200'
+                      : 'bg-navy-50 border-navy-100'
                   }`}
                 >
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    item.unlocked ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-white/10'
+                    item.unlocked
+                      ? 'bg-gradient-to-br from-primary-500 to-primary-600 shadow-md'
+                      : 'bg-navy-100'
                   }`}>
-                    <item.icon className={`w-5 h-5 ${item.unlocked ? 'text-white' : 'text-white/40'}`} />
+                    <item.icon className={`w-5 h-5 ${item.unlocked ? 'text-white' : 'text-navy-400'}`} />
                   </div>
-                  <span className={`text-sm font-medium ${item.unlocked ? 'text-white' : 'text-white/50'}`}>
+                  <span className={`text-sm font-medium ${item.unlocked ? 'text-navy-900' : 'text-navy-400'}`}>
                     {item.label}
                   </span>
                 </motion.div>

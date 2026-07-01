@@ -314,24 +314,6 @@ function StackedCard({
   );
 }
 
-// ─── CarouselBackground ───────────────────────────────────────────────────────
-
-function CarouselBackground({ activeIndex }: { activeIndex: number }) {
-  const theme = THEMES[activeIndex % THEMES.length];
-  return (
-    <motion.div
-      key={activeIndex}
-      className="absolute inset-0 pointer-events-none"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      style={{
-        background: `radial-gradient(ellipse 70% 50% at 50% 0%, rgba(${theme.rgb},0.22) 0%, transparent 70%)`,
-      }}
-    />
-  );
-}
-
 // ─── ChapterTab ───────────────────────────────────────────────────────────────
 
 function ChapterTab({
@@ -373,11 +355,11 @@ function ChapterTab({
           background: isActive
             ? theme.accent
             : hasStarted
-            ? `rgba(${theme.rgb}, 0.18)`
-            : 'rgba(255,255,255,0.07)',
+            ? `rgba(${theme.rgb}, 0.12)`
+            : 'rgba(15,23,42,0.04)',
           border: isActive
             ? `2.5px solid ${theme.accent}`
-            : `2.5px solid ${hasStarted ? `rgba(${theme.rgb}, 0.35)` : 'rgba(255,255,255,0.1)'}`,
+            : `2.5px solid ${hasStarted ? `rgba(${theme.rgb}, 0.3)` : 'rgba(15,23,42,0.08)'}`,
           boxShadow: isActive
             ? `0 4px 16px rgba(${theme.rgb}, 0.45)`
             : 'none',
@@ -389,7 +371,7 @@ function ChapterTab({
         ) : (
           <span
             className="text-lg font-extrabold leading-none"
-            style={{ color: hasStarted ? theme.accent : 'rgba(255,255,255,0.35)' }}
+            style={{ color: hasStarted ? theme.accent : 'rgba(15,23,42,0.3)' }}
           >
             {index}
           </span>
@@ -406,7 +388,7 @@ function ChapterTab({
       {/* Label */}
       <span
         className="text-[10px] font-semibold leading-tight text-center max-w-[72px] line-clamp-1 transition-colors duration-200"
-        style={{ color: isActive ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.38)' }}
+        style={{ color: isActive ? theme.accent : 'rgba(15,23,42,0.4)' }}
       >
         {label}
       </span>
@@ -448,34 +430,37 @@ export function HorizontalCourseList({
 
   return (
     <section
-      className="relative w-full select-none"
+      className="relative w-full select-none bg-gradient-to-b from-navy-50 to-white"
       aria-label={title}
       aria-roledescription="carousel"
-      style={{ background: '#0a0a12' }}
     >
-      {/* Animated background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0" style={{ background: '#0a0a12' }} />
-        <CarouselBackground activeIndex={activeIndex} />
-      </div>
+      {/* Subtle decorative blobs */}
+      <div className="absolute top-10 left-1/4 w-72 h-72 bg-primary-100/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-20 right-1/4 w-80 h-80 bg-primary-50/60 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}
-      <div className="relative z-20 flex items-center justify-between px-6 pt-8 pb-5">
-        <h2 className="text-xl font-bold text-white/90">{title}</h2>
-        <motion.p
+      <div className="relative z-20 flex items-center justify-between px-6 pt-12 pb-5 max-w-7xl mx-auto">
+        <div>
+          <h2 className="text-2xl font-bold text-navy-900">{title}</h2>
+          <p className="text-sm text-navy-500 mt-1">Tap a chapter below to explore its lessons</p>
+        </div>
+        <motion.div
           key={activeIndex}
-          initial={{ opacity: 0, x: 6 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={SPRING}
-          className="text-sm font-semibold"
-          style={{ color: activeTheme.accent }}
+          className="flex items-center gap-2 px-4 py-2 rounded-full"
+          style={{ background: `${activeTheme.accent}15`, border: `1.5px solid ${activeTheme.accent}40` }}
         >
-          {activeIndex + 1} / {chapters.length}
-        </motion.p>
+          <span className="w-2 h-2 rounded-full" style={{ background: activeTheme.accent }} />
+          <span className="text-sm font-bold" style={{ color: activeTheme.accent }}>
+            {activeIndex + 1} / {chapters.length}
+          </span>
+        </motion.div>
       </div>
 
       {/* Carousel area */}
-      <div className="relative z-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-6">
         {/* Card container (clips peek cards) */}
         <div
           ref={containerRef}
@@ -503,7 +488,7 @@ export function HorizontalCourseList({
 
       {/* Chapter tab bar — Duolingo-style icon navigation */}
       <div
-        className="relative z-20 flex items-start justify-center gap-2 sm:gap-3 pt-6 pb-9 px-4 overflow-x-auto no-scrollbar"
+        className="relative z-20 flex items-start justify-center gap-2 sm:gap-3 pt-6 pb-12 px-4 overflow-x-auto no-scrollbar max-w-7xl mx-auto"
         role="tablist"
         aria-label="Chapter navigation"
       >
