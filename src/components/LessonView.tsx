@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, BookOpen, HelpCircle, Trophy, Gem, Sparkles, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, HelpCircle, Trophy, Gem, Sparkles, X, Lock } from 'lucide-react';
 import { Chapter, Lesson, MascotMessage } from '../types/course';
 import { TheorySection } from './TheoryContent';
 import { QuestionCard } from './QuizComponents';
@@ -47,6 +47,7 @@ export function LessonView({
   const [showCelebration, setShowCelebration] = useState(false);
   const [showTheoryModal, setShowTheoryModal] = useState(false);
   const [xpRewards, setXpRewards] = useState<{ id: number; amount: number }[]>([]);
+  const [allSectionsRead, setAllSectionsRead] = useState(false);
   const hasCompletedQuiz = useRef(false);
 
   const previousTheoryLessons = chapter.lessons.filter(l => l.id < lesson.id && l.type === 'theory');
@@ -183,6 +184,7 @@ export function LessonView({
                 sections={lesson.content.sections}
                 realWorldExample={lesson.content.realWorldExample}
                 furtherReading={lesson.furtherReading}
+                onAllSectionsRead={() => setAllSectionsRead(true)}
               />
             )}
           </motion.div>
@@ -206,9 +208,10 @@ export function LessonView({
                 </button>
               )}
               <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={allSectionsRead ? { scale: 1.03 } : undefined}
+                whileTap={allSectionsRead ? { scale: 0.98 } : undefined}
                 onClick={() => {
+                  if (!allSectionsRead) return;
                   onComplete(lesson.xpReward);
                   if (hasNext) {
                     onNext();
@@ -216,17 +219,29 @@ export function LessonView({
                     onBack();
                   }
                 }}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold shadow-glow"
+                disabled={!allSectionsRead}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+                  allSectionsRead
+                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-glow'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
               >
-                {hasNext ? (
-                  <>
-                    Continue
-                    <ChevronRight className="w-5 h-5" />
-                  </>
+                {allSectionsRead ? (
+                  hasNext ? (
+                    <>
+                      Continue
+                      <ChevronRight className="w-5 h-5" />
+                    </>
+                  ) : (
+                    <>
+                      Complete
+                      <Trophy className="w-5 h-5" />
+                    </>
+                  )
                 ) : (
                   <>
-                    Complete
-                    <Trophy className="w-5 h-5" />
+                    <Lock className="w-5 h-5" />
+                    Read all sections
                   </>
                 )}
               </motion.button>
@@ -446,6 +461,7 @@ export function LessonView({
                   sections={lastTheoryLesson.content.sections}
                   realWorldExample={lastTheoryLesson.content.realWorldExample}
                   furtherReading={lastTheoryLesson.furtherReading}
+                  onAllSectionsRead={() => setAllSectionsRead(true)}
                 />
               )}
             </div>
