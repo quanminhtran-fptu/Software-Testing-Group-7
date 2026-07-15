@@ -23,7 +23,7 @@ interface HomeScreenProps {
   isLessonUnlocked: (chapterId: number, lessonId: number) => boolean;
 }
 
-const homeTasks = [
+const homeTasksMeta = [
   {
     title: 'CI/CD Basics',
     tag: 'START HERE',
@@ -33,10 +33,6 @@ const homeTasks = [
     bgColor: 'bg-blue-500',
     description:
       'Learn what CI/CD means and why teams use it to automatically check code after every update.',
-    lessons: [
-      { title: 'What is CI?', done: true },
-      { title: 'What is CD?', done: false },
-    ],
   },
   {
     title: 'Pipeline Flow',
@@ -47,10 +43,6 @@ const homeTasks = [
     bgColor: 'bg-indigo-500',
     description:
       'Understand how code moves through a pipeline: push, install, build, test, and report.',
-    lessons: [
-      { title: 'Pipeline steps', done: false },
-      { title: 'Build and test flow', done: false },
-    ],
   },
   {
     title: 'GitHub Actions',
@@ -61,10 +53,6 @@ const homeTasks = [
     bgColor: 'bg-purple-500',
     description:
       'See how GitHub Actions runs workflows automatically whenever developers push code.',
-    lessons: [
-      { title: 'Workflow file', done: false },
-      { title: 'Push trigger', done: false },
-    ],
   },
   {
     title: 'Testing & Reports',
@@ -75,10 +63,6 @@ const homeTasks = [
     bgColor: 'bg-teal-500',
     description:
       'Learn how automated tests show pass or fail results, and how reports help developers fix problems quickly.',
-    lessons: [
-      { title: 'Automated testing', done: false },
-      { title: 'Reading reports', done: false },
-    ],
   },
 ];
 
@@ -91,8 +75,22 @@ export const HomeScreen = memo(function HomeScreen({
 }: HomeScreenProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const activeTask = homeTasks[activeIndex];
   const activeChapter = chapters[activeIndex] || chapters[0];
+
+  const activeTask = useMemo(() => {
+    const meta = homeTasksMeta[activeIndex];
+    const chapter = chapters[activeIndex];
+    const lessons = chapter
+      ? chapter.lessons
+          .filter((l) => l.type === 'theory')
+          .slice(0, 2)
+          .map((l) => ({
+            title: l.title,
+            done: completedLessons.has(`${chapter.id}-${l.id}`),
+          }))
+      : [];
+    return { ...meta, lessons };
+  }, [activeIndex, chapters, completedLessons]);
 
   const { progressPercent } = useMemo(() => {
     const total = chapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
@@ -333,7 +331,7 @@ export const HomeScreen = memo(function HomeScreen({
 
           {/* Bottom Grid Navigation */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-            {homeTasks.map((task, index) => {
+            {homeTasksMeta.map((task, index) => {
               const Icon = task.icon;
               const isActive = activeIndex === index;
 
