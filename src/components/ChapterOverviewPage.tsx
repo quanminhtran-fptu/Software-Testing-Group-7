@@ -1,5 +1,4 @@
-import { memo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, BookOpen, HelpCircle, ChevronLeft, Zap, CheckCircle2, Lock } from 'lucide-react';
 import { Chapter } from '../types/course';
 
@@ -12,7 +11,7 @@ interface ChapterOverviewPageProps {
   isLessonUnlocked: (chapterId: number, lessonId: number) => boolean;
 }
 
-export const ChapterOverviewPage = memo(function ChapterOverviewPage({
+export function ChapterOverviewPage({
   chapter,
   completedLessons,
   onStartLesson,
@@ -71,45 +70,83 @@ export const ChapterOverviewPage = memo(function ChapterOverviewPage({
         <div className="space-y-4">
           {/* Module card */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
             className="bg-white rounded-[28px] border border-sky-100 shadow-sm p-7"
           >
             {/* Number badge */}
-            <div className="w-20 h-20 rounded-[20px] bg-sky-500 text-white flex items-center justify-center text-5xl font-extrabold shadow-md mb-5">
+            <motion.div
+              initial={{ scale: 0, rotate: -20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.15 }}
+              className="w-20 h-20 rounded-[20px] bg-sky-500 text-white flex items-center justify-center text-5xl font-extrabold shadow-md mb-5"
+            >
               {chapterIndex + 1}
-            </div>
+            </motion.div>
 
-            <p className="text-xs font-bold tracking-widest text-sky-400 uppercase mb-1">
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="text-xs font-bold tracking-widest text-sky-400 uppercase mb-1"
+            >
               Module {chapterIndex + 1}
-            </p>
-            <h1 className="text-3xl font-extrabold text-sky-900 mb-1">
+            </motion.p>
+            <motion.h1
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-3xl font-extrabold text-sky-900 mb-1"
+            >
               {chapter.title}
-            </h1>
-            <p className="text-sky-500 font-medium mb-5">{chapter.description}</p>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="text-sky-500 font-medium mb-5"
+            >
+              {chapter.description}
+            </motion.p>
 
             {/* Learning goals */}
             {goals.length > 0 && (
-              <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 mb-5">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="rounded-2xl border border-sky-100 bg-sky-50 p-4 mb-5"
+              >
                 <p className="text-xs font-bold tracking-widest text-sky-400 uppercase mb-3">
                   You'll be able to
                 </p>
                 <ul className="space-y-2">
                   {goals.map((goal, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sky-800 text-sm font-medium">
+                    <motion.li
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.45 + i * 0.08 }}
+                      className="flex items-start gap-3 text-sky-800 text-sm font-medium"
+                    >
                       <span className="mt-0.5 w-5 h-5 rounded-full bg-sky-200 text-sky-700 flex items-center justify-center text-xs font-bold shrink-0">
                         ✓
                       </span>
                       {goal}
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
-              </div>
+              </motion.div>
             )}
 
             {/* Stats row */}
-            <div className="flex items-center gap-8 text-sky-900">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex items-center gap-8 text-sky-900"
+            >
               <div>
                 <p className="text-2xl font-extrabold">{chapter.lessons.length}</p>
                 <p className="text-xs font-bold text-sky-400 uppercase tracking-wide">lessons</p>
@@ -119,19 +156,25 @@ export const ChapterOverviewPage = memo(function ChapterOverviewPage({
                 <p className="text-xs font-bold text-sky-400 uppercase tracking-wide">XP</p>
               </div>
               <div>
-                <p className="text-2xl font-extrabold">
+                <motion.p
+                  key={doneCount}
+                  initial={{ scale: 1.3 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                  className="text-2xl font-extrabold"
+                >
                   {doneCount}/{chapter.lessons.length}
-                </p>
+                </motion.p>
                 <p className="text-xs font-bold text-sky-400 uppercase tracking-wide">done</p>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
 
           {/* Begin card */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.1 }}
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.2, ease: 'easeOut' }}
             className="bg-white rounded-[28px] border border-sky-100 shadow-sm p-7"
           >
             <p className="text-xs font-bold tracking-widest text-sky-400 uppercase mb-1">
@@ -163,35 +206,64 @@ export const ChapterOverviewPage = memo(function ChapterOverviewPage({
             return (
               <motion.div
                 key={lesson.id}
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.05 * idx }}
+                transition={{
+                  duration: 0.4,
+                  delay: 0.3 + idx * 0.15,
+                  ease: 'easeOut',
+                }}
                 className="flex flex-col items-center w-full max-w-xs"
               >
                 {/* Top connector line (not for first item) */}
                 {!isFirst && (
-                  <div className="w-0.5 h-10 bg-sky-200" />
+                  <motion.div
+                    initial={{ scaleY: 0, opacity: 0 }}
+                    animate={{ scaleY: 1, opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.3 + idx * 0.15 - 0.05 }}
+                    style={{ originY: 0 }}
+                    className="w-0.5 h-10 bg-sky-200"
+                  />
                 )}
 
                 {/* Node */}
-                <button
+                <motion.button
+                  whileHover={isUnlocked ? { scale: 1.05 } : undefined}
+                  whileTap={isUnlocked ? { scale: 0.95 } : undefined}
                   onClick={() => isUnlocked && onStartLesson(chapter.id, lesson.id)}
                   disabled={!isUnlocked}
                   className={`group relative flex flex-col items-center w-full ${!isUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   {/* Icon bubble */}
                   <div className="relative mb-2">
-                    {/* Outer ring for active/first */}
+                    {/* Pulsing outer ring for active/first-incomplete */}
                     {isFirst && !isCompleted && isUnlocked && (
                       <motion.div
-                        animate={{ scale: [1, 1.18, 1] }}
+                        animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0, 0.5] }}
                         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                        className="absolute inset-0 rounded-full bg-sky-300 opacity-40 -m-2"
+                        className="absolute inset-0 rounded-full bg-sky-400 -m-2"
                       />
                     )}
 
-                    <div
-                      className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-all ${isUnlocked ? 'group-hover:scale-110' : ''} ${!isCompleted && isUnlocked ? 'glow-pulse' : ''} ${
+                    {/* Completion burst ring */}
+                    <AnimatePresence>
+                      {isCompleted && (
+                        <motion.div
+                          initial={{ scale: 1, opacity: 0.6 }}
+                          animate={{ scale: 1.6, opacity: 0 }}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          className="absolute inset-0 rounded-full bg-green-400 -m-1"
+                        />
+                      )}
+                    </AnimatePresence>
+
+                    <motion.div
+                      animate={isCompleted ? {
+                        scale: [1, 1.3, 1],
+                        rotate: [0, 10, -10, 0],
+                      } : {}}
+                      transition={isCompleted ? { duration: 0.5 } : {}}
+                      className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-colors ${
                         isCompleted
                           ? 'bg-green-500 text-white'
                           : !isUnlocked
@@ -203,20 +275,38 @@ export const ChapterOverviewPage = memo(function ChapterOverviewPage({
                           : 'bg-sky-100 text-sky-400'
                       }`}
                     >
-                      {isCompleted ? (
-                        <CheckCircle2 className="w-7 h-7" />
-                      ) : !isUnlocked ? (
-                        <Lock className="w-6 h-6" />
-                      ) : isQuiz ? (
-                        <HelpCircle className="w-7 h-7" />
-                      ) : (
-                        <BookOpen className="w-7 h-7" />
-                      )}
-                    </div>
+                      <AnimatePresence mode="wait">
+                        {isCompleted ? (
+                          <motion.div
+                            key="check"
+                            initial={{ scale: 0, rotate: -90 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                          >
+                            <CheckCircle2 className="w-7 h-7" />
+                          </motion.div>
+                        ) : !isUnlocked ? (
+                          <motion.div key="lock" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.4 + idx * 0.15 }}>
+                            <Lock className="w-6 h-6" />
+                          </motion.div>
+                        ) : isQuiz ? (
+                          <motion.div key="quiz" initial={{ scale: 0, rotate: 90 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.3 + idx * 0.15 }}>
+                            <HelpCircle className="w-7 h-7" />
+                          </motion.div>
+                        ) : (
+                          <motion.div key="book" initial={{ scale: 0, y: -10 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.3 + idx * 0.15 }}>
+                            <BookOpen className="w-7 h-7" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
                   </div>
 
                   {/* Lesson label */}
-                  <span
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 + idx * 0.15 }}
                     className={`text-sm font-bold text-center leading-snug ${
                       isCompleted
                         ? 'text-green-600'
@@ -228,14 +318,19 @@ export const ChapterOverviewPage = memo(function ChapterOverviewPage({
                     }`}
                   >
                     {lesson.title}
-                  </span>
+                  </motion.span>
 
                   {/* XP badge */}
-                  <span className="mt-1 flex items-center gap-1 text-xs font-bold text-amber-500">
+                  <motion.span
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.45 + idx * 0.15 }}
+                    className="mt-1 flex items-center burst-in gap-1 text-xs font-bold text-amber-500"
+                  >
                     <Zap className="w-3 h-3" />
                     {lesson.xpReward} XP
-                  </span>
-                </button>
+                  </motion.span>
+                </motion.button>
               </motion.div>
             );
           })}
@@ -243,4 +338,4 @@ export const ChapterOverviewPage = memo(function ChapterOverviewPage({
       </div>
     </main>
   );
-});
+}
