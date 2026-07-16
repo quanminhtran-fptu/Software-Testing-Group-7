@@ -1,0 +1,341 @@
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, BookOpen, HelpCircle, ChevronLeft, Zap, CheckCircle2, Lock } from 'lucide-react';
+import { Chapter } from '../types/course';
+
+interface ChapterOverviewPageProps {
+  chapter: Chapter;
+  completedLessons: Set<string>;
+  onStartLesson: (chapterId: number, lessonId: number) => void;
+  onBack: () => void;
+  chapterIndex: number;
+  isLessonUnlocked: (chapterId: number, lessonId: number) => boolean;
+}
+
+export function ChapterOverviewPage({
+  chapter,
+  completedLessons,
+  onStartLesson,
+  onBack,
+  chapterIndex,
+  isLessonUnlocked,
+}: ChapterOverviewPageProps) {
+  const totalXp = chapter.lessons.reduce((sum, l) => sum + l.xpReward, 0);
+  const doneCount = chapter.lessons.filter((l) =>
+    completedLessons.has(`${chapter.id}-${l.id}`)
+  ).length;
+
+  const firstIncomplete = chapter.lessons.find(
+    (l) => !completedLessons.has(`${chapter.id}-${l.id}`)
+  ) ?? chapter.lessons[0];
+
+  const learningGoals: Record<number, string[]> = {
+    1: [
+      'Explain what CI and CD mean and how they differ.',
+      'Describe the automated steps triggered by a pull request.',
+      'Identify the benefits and drawbacks of CI/CD in a team.',
+    ],
+    2: [
+      'Describe how stages and jobs form a pipeline.',
+      'Configure a basic .gitlab-ci.yml pipeline file.',
+      'Understand what runners do and how variables work.',
+    ],
+    3: [
+      'Compare build configuration across CI/CD platforms.',
+      'Define job dependencies using workflow requires.',
+      'Migrate a Buildkite pipeline to CircleCI step by step.',
+    ],
+    4: [
+      'Explain how Bitrise automates mobile builds and tests.',
+      'Use Build Cache to speed up pipeline execution.',
+      'Read CI/CD reports and act on failures to improve quality.',
+    ],
+  };
+  const goals = learningGoals[chapter.id] ?? [];
+
+  return (
+    <main className="pt-20 min-h-screen bg-sky-50">
+      {/* Back nav */}
+      <div className="max-w-7xl mx-auto px-6 pt-4 pb-2">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sky-700 font-semibold hover:text-sky-900 transition-colors px-4 py-2 rounded-2xl hover:bg-white"
+        >
+          <ChevronLeft className="w-5 h-5" />
+          Home
+        </button>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 pb-12 grid grid-cols-1 xl:grid-cols-[480px_1fr] gap-8 items-start">
+        {/* ── LEFT PANEL ── */}
+        <div className="space-y-4">
+          {/* Module card */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="bg-white rounded-[28px] border border-sky-100 shadow-sm p-7"
+          >
+            {/* Number badge */}
+            <motion.div
+              initial={{ scale: 0, rotate: -20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.15 }}
+              className="w-20 h-20 rounded-[20px] bg-sky-500 text-white flex items-center justify-center text-5xl font-extrabold shadow-md mb-5"
+            >
+              {chapterIndex + 1}
+            </motion.div>
+
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="text-xs font-bold tracking-widest text-sky-400 uppercase mb-1"
+            >
+              Module {chapterIndex + 1}
+            </motion.p>
+            <motion.h1
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-3xl font-extrabold text-sky-900 mb-1"
+            >
+              {chapter.title}
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="text-sky-500 font-medium mb-5"
+            >
+              {chapter.description}
+            </motion.p>
+
+            {/* Learning goals */}
+            {goals.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="rounded-2xl border border-sky-100 bg-sky-50 p-4 mb-5"
+              >
+                <p className="text-xs font-bold tracking-widest text-sky-400 uppercase mb-3">
+                  You'll be able to
+                </p>
+                <ul className="space-y-2">
+                  {goals.map((goal, i) => (
+                    <motion.li
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.45 + i * 0.08 }}
+                      className="flex items-start gap-3 text-sky-800 text-sm font-medium"
+                    >
+                      <span className="mt-0.5 w-5 h-5 rounded-full bg-sky-200 text-sky-700 flex items-center justify-center text-xs font-bold shrink-0">
+                        ✓
+                      </span>
+                      {goal}
+                    </motion.li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
+
+            {/* Stats row */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex items-center gap-8 text-sky-900"
+            >
+              <div>
+                <p className="text-2xl font-extrabold">{chapter.lessons.length}</p>
+                <p className="text-xs font-bold text-sky-400 uppercase tracking-wide">lessons</p>
+              </div>
+              <div>
+                <p className="text-2xl font-extrabold">{totalXp}</p>
+                <p className="text-xs font-bold text-sky-400 uppercase tracking-wide">XP</p>
+              </div>
+              <div>
+                <motion.p
+                  key={doneCount}
+                  initial={{ scale: 1.3 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                  className="text-2xl font-extrabold"
+                >
+                  {doneCount}/{chapter.lessons.length}
+                </motion.p>
+                <p className="text-xs font-bold text-sky-400 uppercase tracking-wide">done</p>
+              </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Begin card */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.2, ease: 'easeOut' }}
+            className="bg-white rounded-[28px] border border-sky-100 shadow-sm p-7"
+          >
+            <p className="text-xs font-bold tracking-widest text-sky-400 uppercase mb-1">
+              {doneCount === 0 ? 'Begin' : doneCount >= chapter.lessons.length ? 'Completed' : 'Continue'}
+            </p>
+            <h2 className="text-2xl font-extrabold text-sky-900 mb-5">
+              {firstIncomplete.title}
+            </h2>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onStartLesson(chapter.id, firstIncomplete.id)}
+              className="w-full rounded-[18px] bg-sky-500 hover:bg-sky-400 text-white text-xl font-extrabold py-4 shadow-md transition-all flex items-center justify-center gap-3"
+            >
+              Start
+              <ArrowRight className="w-5 h-5" />
+            </motion.button>
+          </motion.div>
+        </div>
+
+        {/* ── RIGHT PANEL: Lesson trail ── */}
+        <div className="flex flex-col items-center pt-2">
+          {chapter.lessons.map((lesson, idx) => {
+            const isCompleted = completedLessons.has(`${chapter.id}-${lesson.id}`);
+            const isQuiz = lesson.type === 'quiz';
+            const isFirst = idx === 0;
+            const isUnlocked = isLessonUnlocked(chapter.id, lesson.id);
+
+            return (
+              <motion.div
+                key={lesson.id}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.4,
+                  delay: 0.3 + idx * 0.15,
+                  ease: 'easeOut',
+                }}
+                className="flex flex-col items-center w-full max-w-xs"
+              >
+                {/* Top connector line (not for first item) */}
+                {!isFirst && (
+                  <motion.div
+                    initial={{ scaleY: 0, opacity: 0 }}
+                    animate={{ scaleY: 1, opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.3 + idx * 0.15 - 0.05 }}
+                    style={{ originY: 0 }}
+                    className="w-0.5 h-10 bg-sky-200"
+                  />
+                )}
+
+                {/* Node */}
+                <motion.button
+                  whileHover={isUnlocked ? { scale: 1.05 } : undefined}
+                  whileTap={isUnlocked ? { scale: 0.95 } : undefined}
+                  onClick={() => isUnlocked && onStartLesson(chapter.id, lesson.id)}
+                  disabled={!isUnlocked}
+                  className={`group relative flex flex-col items-center w-full ${!isUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  {/* Icon bubble */}
+                  <div className="relative mb-2">
+                    {/* Pulsing outer ring for active/first-incomplete */}
+                    {isFirst && !isCompleted && isUnlocked && (
+                      <motion.div
+                        animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                        className="absolute inset-0 rounded-full bg-sky-400 -m-2"
+                      />
+                    )}
+
+                    {/* Completion burst ring */}
+                    <AnimatePresence>
+                      {isCompleted && (
+                        <motion.div
+                          initial={{ scale: 1, opacity: 0.6 }}
+                          animate={{ scale: 1.6, opacity: 0 }}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          className="absolute inset-0 rounded-full bg-green-400 -m-1"
+                        />
+                      )}
+                    </AnimatePresence>
+
+                    <motion.div
+                      animate={isCompleted ? {
+                        scale: [1, 1.3, 1],
+                        rotate: [0, 10, -10, 0],
+                      } : {}}
+                      transition={isCompleted ? { duration: 0.5 } : {}}
+                      className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-colors ${
+                        isCompleted
+                          ? 'bg-green-500 text-white'
+                          : !isUnlocked
+                          ? 'bg-navy-100 text-navy-400'
+                          : isFirst
+                          ? 'bg-sky-500 text-white'
+                          : isQuiz
+                          ? 'bg-sky-200 text-sky-700'
+                          : 'bg-sky-100 text-sky-400'
+                      }`}
+                    >
+                      <AnimatePresence mode="wait">
+                        {isCompleted ? (
+                          <motion.div
+                            key="check"
+                            initial={{ scale: 0, rotate: -90 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                          >
+                            <CheckCircle2 className="w-7 h-7" />
+                          </motion.div>
+                        ) : !isUnlocked ? (
+                          <motion.div key="lock" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.4 + idx * 0.15 }}>
+                            <Lock className="w-6 h-6" />
+                          </motion.div>
+                        ) : isQuiz ? (
+                          <motion.div key="quiz" initial={{ scale: 0, rotate: 90 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.3 + idx * 0.15 }}>
+                            <HelpCircle className="w-7 h-7" />
+                          </motion.div>
+                        ) : (
+                          <motion.div key="book" initial={{ scale: 0, y: -10 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.3 + idx * 0.15 }}>
+                            <BookOpen className="w-7 h-7" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  </div>
+
+                  {/* Lesson label */}
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 + idx * 0.15 }}
+                    className={`text-sm font-bold text-center leading-snug ${
+                      isCompleted
+                        ? 'text-green-600'
+                        : !isUnlocked
+                        ? 'text-navy-400'
+                        : isFirst
+                        ? 'text-sky-700'
+                        : 'text-sky-400'
+                    }`}
+                  >
+                    {lesson.title}
+                  </motion.span>
+
+                  {/* XP badge */}
+                  <motion.span
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.45 + idx * 0.15 }}
+                    className="mt-1 flex items-center burst-in gap-1 text-xs font-bold text-amber-500"
+                  >
+                    <Zap className="w-3 h-3" />
+                    {lesson.xpReward} XP
+                  </motion.span>
+                </motion.button>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </main>
+  );
+}

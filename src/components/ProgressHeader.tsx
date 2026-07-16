@@ -8,6 +8,8 @@ interface ProgressHeaderProps {
   onMenuClick: () => void;
   onHomeClick: () => void;
   onCourseClick: () => void;
+  canGoBack?: boolean;
+  onBackClick?: () => void;
 }
 
 export function ProgressHeader({
@@ -16,11 +18,23 @@ export function ProgressHeader({
   onMenuClick,
   onHomeClick,
   onCourseClick,
+  canGoBack,
+  onBackClick,
 }: ProgressHeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 glass border-b border-navy-100 z-40">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
+          {canGoBack && onBackClick && (
+            <button
+              onClick={onBackClick}
+              className="p-2 hover:bg-navy-100 rounded-lg transition-colors"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-5 h-5 text-navy-600" />
+            </button>
+          )}
+
           <button
             onClick={onMenuClick}
             className="p-2 hover:bg-navy-100 rounded-lg md:hidden transition-colors"

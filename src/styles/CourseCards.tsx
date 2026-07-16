@@ -20,7 +20,6 @@ import {
 import {
   BookOpen, Layers, Search, PenTool, ClipboardList, Wrench,
   CheckCircle2, Lock, Play, FileText, HelpCircle,
-  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Chapter, Lesson } from '../types/course';
 
@@ -33,8 +32,6 @@ const CARD_W   = 'min(340px, 82vw)' as const;
 // Spring config from spec
 const SPRING = { type: 'spring' as const, stiffness: 280, damping: 28, mass: 0.8 };
 
-const DRAG_SENSITIVITY  = 0.65;  // lower = easier to flick
-const FLICK_VELOCITY_PX = 300;   // px/s threshold for velocity-based snap
 
 // ─── Theme palette ────────────────────────────────────────────────────────────
 
@@ -64,17 +61,6 @@ function useCarousel(count: number) {
   const cardRef    = useRef<HTMLDivElement>(null); // ref on card 0 for measurement
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Drag state
-  const isDragging  = useRef(false);
-  const dragStartX  = useRef(0);
-  const dragStartP  = useRef(0);
-  const lastX       = useRef(0);
-  const lastTime    = useRef(0);
-  const velocityX   = useRef(0); // px/s, leftward = positive (→ next card)
-
-  // Wheel lockout (one card per gesture group)
-  const wheelLocked = useRef(false);
-
   activeRef.current = activeIndex;
 
   // Measure card width after mount and on resize
@@ -103,86 +89,9 @@ function useCarousel(count: number) {
     [count, progress],
   );
 
-  const goNext = useCallback(() => goTo(activeRef.current + 1), [goTo]);
-  const goPrev = useCallback(() => goTo(activeRef.current - 1), [goTo]);
-
-  // Keyboard
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
-      if (e.key === 'ArrowLeft')  { e.preventDefault(); goPrev(); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [goNext, goPrev]);
-
-  // Wheel / trackpad — snap exactly one card per gesture group
-  const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      e.preventDefault();
-      if (wheelLocked.current) return;
-      // Prefer horizontal delta (trackpad), fall back to vertical (mouse wheel)
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      const dir = delta > 0 ? 1 : -1;
-      goTo(activeRef.current + dir);
-      wheelLocked.current = true;
-      setTimeout(() => { wheelLocked.current = false; }, 680);
-    },
-    [goTo],
-  );
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
-
-  // Pointer drag (mouse + touch via pointer capture)
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    dragStartP.current = progress.get();
-    lastX.current      = e.clientX;
-    lastTime.current   = Date.now();
-    velocityX.current  = 0;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, [progress]);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging.current) return;
-    const now = Date.now();
-    const dt  = Math.max(1, now - lastTime.current);
-    // leftward movement = positive velocity = next card
-    velocityX.current = ((lastX.current - e.clientX) / dt) * 1000;
-    lastX.current    = e.clientX;
-    lastTime.current = now;
-
-    const delta = (dragStartX.current - e.clientX) * DRAG_SENSITIVITY;
-    const raw   = dragStartP.current + delta / strideRef.current;
-    const lo = 0, hi = count - 1;
-    const elastic = raw < lo
-      ? lo + (raw - lo) * 0.14
-      : raw > hi
-      ? hi + (raw - hi) * 0.14
-      : raw;
-    progress.set(elastic);
-  }, [count, progress]);
-
-  const onPointerUp = useCallback((_e?: React.PointerEvent) => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    const current = progress.get();
-    let target = Math.round(current);
-    if (velocityX.current >  FLICK_VELOCITY_PX) target = Math.ceil(current);
-    if (velocityX.current < -FLICK_VELOCITY_PX) target = Math.floor(current);
-    goTo(target);
-  }, [progress, goTo]);
-
   return {
-    activeIndex, progress, goTo, goNext, goPrev,
+    activeIndex, progress, goTo,
     strideRef, cardWRef, cardRef, containerRef,
-    onPointerDown, onPointerMove, onPointerUp,
   };
 }
 
@@ -405,53 +314,95 @@ function StackedCard({
   );
 }
 
-// ─── CarouselBackground ───────────────────────────────────────────────────────
+// ─── ChapterTab ───────────────────────────────────────────────────────────────
 
-function CarouselBackground({ activeIndex }: { activeIndex: number }) {
-  const theme = THEMES[activeIndex % THEMES.length];
-  return (
-    <motion.div
-      key={activeIndex}
-      className="absolute inset-0 pointer-events-none"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      style={{
-        background: `radial-gradient(ellipse 70% 50% at 50% 0%, rgba(${theme.rgb},0.22) 0%, transparent 70%)`,
-      }}
-    />
-  );
-}
-
-// ─── PaginationDot ────────────────────────────────────────────────────────────
-
-function PaginationDot({
+function ChapterTab({
+  chapter,
   index,
   isActive,
-  progress,
+  completedLessons,
   onClick,
 }: {
+  chapter: Chapter;
   index: number;
   isActive: boolean;
-  progress: MotionValue<number>;
+  completedLessons: Set<string>;
   onClick: () => void;
 }) {
-  const dotOpacity = useTransform(progress, (p) => Math.max(0.25, 1 - Math.abs(p - index) * 0.75));
+  const theme = THEMES[index % THEMES.length];
+  const Icon  = CHAPTER_ICONS[chapter.icon] || BookOpen;
+  const doneCount  = chapter.lessons.filter(l => completedLessons.has(`${chapter.id}-${l.id}`)).length;
+  const allDone    = doneCount === chapter.lessons.length;
+  const hasStarted = doneCount > 0;
+
+  // Short label: first word of title or "Start"
+  const label = index === 0
+    ? 'Start'
+    : chapter.title.split(' ').slice(0, 2).join(' ');
+
   return (
-    <motion.button
+    <button
       onClick={onClick}
-      animate={{ width: isActive ? 24 : 8 }}
-      transition={SPRING}
-      aria-label={`Go to chapter ${index + 1}`}
+      aria-label={`Go to chapter: ${chapter.title}`}
       aria-current={isActive ? 'true' : undefined}
-      className="rounded-full"
-      style={{
-        height: 8,
-        background: isActive ? '#ffffff' : 'rgba(255,255,255,0.32)',
-        opacity: dotOpacity,
-        flexShrink: 0,
-      } as React.CSSProperties}
-    />
+      className="flex flex-col items-center gap-1 flex-shrink-0 relative"
+      style={{ minWidth: 72 }}
+    >
+      {/* Icon bubble */}
+      <div
+        className="relative w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200"
+        style={{
+          background: isActive
+            ? theme.accent
+            : hasStarted
+            ? `rgba(${theme.rgb}, 0.12)`
+            : 'rgba(15,23,42,0.04)',
+          border: isActive
+            ? `2.5px solid ${theme.accent}`
+            : `2.5px solid ${hasStarted ? `rgba(${theme.rgb}, 0.3)` : 'rgba(15,23,42,0.08)'}`,
+          boxShadow: isActive
+            ? `0 4px 16px rgba(${theme.rgb}, 0.45)`
+            : 'none',
+        }}
+      >
+        {/* Number badge (non-active) or icon */}
+        {isActive ? (
+          <Icon className="w-6 h-6 text-white" />
+        ) : (
+          <span
+            className="text-lg font-extrabold leading-none"
+            style={{ color: hasStarted ? theme.accent : 'rgba(15,23,42,0.3)' }}
+          >
+            {index}
+          </span>
+        )}
+
+        {/* Completion ring */}
+        {allDone && !isActive && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+            <CheckCircle2 className="w-3 h-3 text-white" />
+          </span>
+        )}
+      </div>
+
+      {/* Label */}
+      <span
+        className="text-[10px] font-semibold leading-tight text-center max-w-[72px] line-clamp-1 transition-colors duration-200"
+        style={{ color: isActive ? theme.accent : 'rgba(15,23,42,0.4)' }}
+      >
+        {label}
+      </span>
+
+      {/* Active underline */}
+      {isActive && (
+        <motion.div
+          layoutId="tab-underline"
+          className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full"
+          style={{ width: 24, height: 3, background: theme.accent }}
+          transition={SPRING}
+        />
+      )}
+    </button>
   );
 }
 
@@ -471,54 +422,51 @@ export function HorizontalCourseList({
   title = 'Course Chapters',
 }: HorizontalCourseListProps) {
   const {
-    activeIndex, progress, goTo, goNext, goPrev,
+    activeIndex, progress, goTo,
     strideRef, cardWRef, cardRef, containerRef,
-    onPointerDown, onPointerMove, onPointerUp,
   } = useCarousel(chapters.length);
 
   const activeTheme = THEMES[activeIndex % THEMES.length];
 
   return (
     <section
-      className="relative w-full select-none"
+      className="relative w-full select-none bg-gradient-to-b from-navy-50 to-white"
       aria-label={title}
       aria-roledescription="carousel"
-      style={{ background: '#0a0a12' }}
     >
-      {/* Animated background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0" style={{ background: '#0a0a12' }} />
-        <CarouselBackground activeIndex={activeIndex} />
-      </div>
+      {/* Subtle decorative blobs */}
+      <div className="absolute top-10 left-1/4 w-72 h-72 bg-primary-100/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-20 right-1/4 w-80 h-80 bg-primary-50/60 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}
-      <div className="relative z-20 flex items-center justify-between px-6 pt-8 pb-5">
-        <h2 className="text-xl font-bold text-white/90">{title}</h2>
-        <motion.p
+      <div className="relative z-20 flex items-center justify-between px-6 pt-12 pb-5 max-w-7xl mx-auto">
+        <div>
+          <h2 className="text-2xl font-bold text-navy-900">{title}</h2>
+          <p className="text-sm text-navy-500 mt-1">Tap a chapter below to explore its lessons</p>
+        </div>
+        <motion.div
           key={activeIndex}
-          initial={{ opacity: 0, x: 6 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={SPRING}
-          className="text-sm font-semibold"
-          style={{ color: activeTheme.accent }}
+          className="flex items-center gap-2 px-4 py-2 rounded-full"
+          style={{ background: `${activeTheme.accent}15`, border: `1.5px solid ${activeTheme.accent}40` }}
         >
-          {activeIndex + 1} / {chapters.length}
-        </motion.p>
+          <span className="w-2 h-2 rounded-full" style={{ background: activeTheme.accent }} />
+          <span className="text-sm font-bold" style={{ color: activeTheme.accent }}>
+            {activeIndex + 1} / {chapters.length}
+          </span>
+        </motion.div>
       </div>
 
       {/* Carousel area */}
-      <div className="relative z-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-6">
         {/* Card container (clips peek cards) */}
         <div
           ref={containerRef}
-          className="relative cursor-grab active:cursor-grabbing touch-none"
+          className="relative"
           style={{ height: CARD_H, overflow: 'hidden' }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerUp}
           role="list"
-          tabIndex={0}
           aria-label={`${chapters.length} chapters`}
         >
           {chapters.map((chapter, index) => (
@@ -536,48 +484,21 @@ export function HorizontalCourseList({
             />
           ))}
         </div>
-
-        {/* Left / right nav buttons — centered vertically over the card area */}
-        <div className="absolute inset-y-0 left-0 flex items-center pl-2 z-20 pointer-events-none">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={goPrev}
-            disabled={activeIndex === 0}
-            className="pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-20 transition-opacity"
-            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
-            aria-label="Previous chapter"
-          >
-            <ChevronLeft className="w-5 h-5 text-white" />
-          </motion.button>
-        </div>
-        <div className="absolute inset-y-0 right-0 flex items-center pr-2 z-20 pointer-events-none">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={goNext}
-            disabled={activeIndex === chapters.length - 1}
-            className="pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-20 transition-opacity"
-            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
-            aria-label="Next chapter"
-          >
-            <ChevronRight className="w-5 h-5 text-white" />
-          </motion.button>
-        </div>
       </div>
 
-      {/* Horizontal pagination dots */}
+      {/* Chapter tab bar — Duolingo-style icon navigation */}
       <div
-        className="relative z-20 flex items-center justify-center gap-2 pt-5 pb-8"
+        className="relative z-20 flex items-start justify-center gap-2 sm:gap-3 pt-6 pb-12 px-4 overflow-x-auto no-scrollbar max-w-7xl mx-auto"
         role="tablist"
-        aria-label="Chapter pagination"
+        aria-label="Chapter navigation"
       >
-        {chapters.map((_, i) => (
-          <PaginationDot
-            key={i}
+        {chapters.map((chapter, i) => (
+          <ChapterTab
+            key={chapter.id}
+            chapter={chapter}
             index={i}
             isActive={i === activeIndex}
-            progress={progress}
+            completedLessons={completedLessons}
             onClick={() => goTo(i)}
           />
         ))}

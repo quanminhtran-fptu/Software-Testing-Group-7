@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, BookOpen, HelpCircle, Trophy, Gem, Sparkles, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, HelpCircle, Trophy, Gem, Sparkles, X, Lock } from 'lucide-react';
 import { Chapter, Lesson, MascotMessage } from '../types/course';
 import { TheorySection } from './TheoryContent';
 import { QuestionCard } from './QuizComponents';
@@ -45,8 +45,13 @@ export function LessonView({
   const [mascotMessage, setMascotMessage] = useState<MascotMessage | null>(null);
   const [quizResultShown, setQuizResultShown] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showTheoryModal, setShowTheoryModal] = useState(false);
   const [xpRewards, setXpRewards] = useState<{ id: number; amount: number }[]>([]);
+  const [allSectionsRead, setAllSectionsRead] = useState(false);
   const hasCompletedQuiz = useRef(false);
+
+  const previousTheoryLessons = chapter.lessons.filter(l => l.id < lesson.id && l.type === 'theory');
+  const lastTheoryLesson = previousTheoryLessons[previousTheoryLessons.length - 1];
 
   const { toasts, addToast, removeToast } = useToasts();
 
@@ -57,6 +62,7 @@ export function LessonView({
     setCorrectAnswers(0);
     setQuizResultShown(false);
     setShowCelebration(false);
+    setShowTheoryModal(false);
     setXpRewards([]);
     hasCompletedQuiz.current = false;
   }, [lesson.id]);
@@ -178,6 +184,7 @@ export function LessonView({
                 sections={lesson.content.sections}
                 realWorldExample={lesson.content.realWorldExample}
                 furtherReading={lesson.furtherReading}
+                onAllSectionsRead={() => setAllSectionsRead(true)}
               />
             )}
           </motion.div>
@@ -201,9 +208,10 @@ export function LessonView({
                 </button>
               )}
               <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={allSectionsRead ? { scale: 1.03 } : undefined}
+                whileTap={allSectionsRead ? { scale: 0.98 } : undefined}
                 onClick={() => {
+                  if (!allSectionsRead) return;
                   onComplete(lesson.xpReward);
                   if (hasNext) {
                     onNext();
@@ -211,17 +219,29 @@ export function LessonView({
                     onBack();
                   }
                 }}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold shadow-glow"
+                disabled={!allSectionsRead}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+                  allSectionsRead
+                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-glow'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
               >
-                {hasNext ? (
-                  <>
-                    Continue
-                    <ChevronRight className="w-5 h-5" />
-                  </>
+                {allSectionsRead ? (
+                  hasNext ? (
+                    <>
+                      Continue
+                      <ChevronRight className="w-5 h-5" />
+                    </>
+                  ) : (
+                    <>
+                      Complete
+                      <Trophy className="w-5 h-5" />
+                    </>
+                  )
                 ) : (
                   <>
-                    Complete
-                    <Trophy className="w-5 h-5" />
+                    <Lock className="w-5 h-5" />
+                    Read all sections
                   </>
                 )}
               </motion.button>
@@ -383,6 +403,7 @@ export function LessonView({
                   question={currentQuestion}
                   onAnswer={handleAnswer}
                   showHint={false}
+                  onReviewTheory={lastTheoryLesson ? () => setShowTheoryModal(true) : undefined}
                 />
               )}
             </motion.div>
@@ -414,6 +435,48 @@ export function LessonView({
         isVisible={showMascot}
         onClose={() => setShowMascot(false)}
       />
+
+      {/* Theory Review Modal */}
+      {showTheoryModal && lastTheoryLesson && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="fixed inset-0 z-50 bg-white overflow-y-auto"
+        >
+          <div className="max-w-4xl mx-auto px-4 py-8 pb-32">
+            <div className="flex justify-between items-center mb-8 sticky top-0 bg-white/90 backdrop-blur-md py-4 z-10 border-b border-navy-100">
+              <h2 className="text-2xl font-bold text-navy-900">Review: {lastTheoryLesson.title}</h2>
+              <button 
+                onClick={() => setShowTheoryModal(false)} 
+                className="p-3 bg-navy-100 rounded-full hover:bg-navy-200 transition-colors"
+              >
+                <X className="w-6 h-6 text-navy-600" />
+              </button>
+            </div>
+            
+            <div className="bg-white rounded-3xl shadow-medium border border-navy-100 p-6 md:p-8">
+              {lastTheoryLesson.content.sections && (
+                <TheorySection
+                  sections={lastTheoryLesson.content.sections}
+                  realWorldExample={lastTheoryLesson.content.realWorldExample}
+                  furtherReading={lastTheoryLesson.furtherReading}
+                  onAllSectionsRead={() => setAllSectionsRead(true)}
+                />
+              )}
+            </div>
+
+            <div className="mt-8 flex justify-center">
+              <button 
+                onClick={() => setShowTheoryModal(false)} 
+                className="py-4 px-12 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl shadow-glow hover:scale-105 transition-transform"
+              >
+                Return to Quiz
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
